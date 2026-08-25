@@ -119,6 +119,7 @@ export function AdminPanel() {
   const [configHeroTitle, setConfigHeroTitle] = useState('');
   const [configHeroSubtitle, setConfigHeroSubtitle] = useState('');
   const [configHeroBgUrl, setConfigHeroBgUrl] = useState('');
+  const [configMainTeamImageUrl, setConfigMainTeamImageUrl] = useState('');
   const [configCtaButtonText, setConfigCtaButtonText] = useState('Acceso a Miembros');
   
   const [configShowAnnouncement, setConfigShowAnnouncement] = useState(true);
@@ -156,6 +157,7 @@ export function AdminPanel() {
     if (appSettings.heroTitle) setConfigHeroTitle(appSettings.heroTitle);
     if (appSettings.heroSubtitle) setConfigHeroSubtitle(appSettings.heroSubtitle);
     if (appSettings.heroBgUrl) setConfigHeroBgUrl(appSettings.heroBgUrl);
+    if (appSettings.mainTeamImageUrl) setConfigMainTeamImageUrl(appSettings.mainTeamImageUrl);
     if (appSettings.ctaButtonText) setConfigCtaButtonText(appSettings.ctaButtonText);
     
     if (typeof appSettings.showAnnouncement === 'boolean') setConfigShowAnnouncement(appSettings.showAnnouncement);
@@ -286,6 +288,153 @@ export function AdminPanel() {
     reader.readAsDataURL(file);
   };
 
+  // Upload handler for Main Team Official Photo (Imagen Oficial del Equipo Principal)
+  const handleMainTeamImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Por favor selecciona una imagen válida.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 1280;
+        const MAX_HEIGHT = 900;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+        setConfigMainTeamImageUrl(dataUrl);
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Upload handler for Hero Background Banner
+  const handleHeroBgUpload = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Por favor selecciona una imagen válida.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 1400;
+        const MAX_HEIGHT = 900;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        setConfigHeroBgUrl(dataUrl);
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Upload handler for Media Library files
+  const handleMediaFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+      alert('Por favor selecciona un archivo de imagen o video válido.');
+      return;
+    }
+
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 1200;
+          const MAX_HEIGHT = 1200;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          setUrl(dataUrl);
+          if (!title) {
+            const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+            setTitle(cleanName.charAt(0).toUpperCase() + cleanName.slice(1));
+          }
+        };
+        img.src = event.target?.result as string;
+      };
+      reader.readAsDataURL(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setUrl(ev.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleManualColorExtract = async () => {
     if (!configLogoUrl) {
       alert('Por favor sube o selecciona un logo primero.');
@@ -307,7 +456,7 @@ export function AdminPanel() {
   const handleMediaSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!title || !url) {
-      setError('Título y URL son obligatorios');
+      setError('Por favor selecciona una foto desde tu carpeta o dispositivo y asigna un título');
       return;
     }
 
@@ -516,6 +665,7 @@ export function AdminPanel() {
         heroTitle: configHeroTitle.trim(),
         heroSubtitle: configHeroSubtitle.trim(),
         heroBgUrl: configHeroBgUrl.trim(),
+        mainTeamImageUrl: configMainTeamImageUrl.trim(),
         ctaButtonText: configCtaButtonText.trim() || 'Acceso a Miembros',
         showAnnouncement: configShowAnnouncement,
         announcementText: configAnnouncementText.trim(),
@@ -568,6 +718,7 @@ export function AdminPanel() {
     heroTitle: configHeroTitle,
     heroSubtitle: configHeroSubtitle,
     heroBgUrl: configHeroBgUrl,
+    mainTeamImageUrl: configMainTeamImageUrl || appSettings.mainTeamImageUrl,
     ctaButtonText: configCtaButtonText,
     showAnnouncement: configShowAnnouncement,
     announcementText: configAnnouncementText,
@@ -790,38 +941,60 @@ export function AdminPanel() {
                     </select>
                   </div>
 
+                  {/* File Upload Only - No URL Input */}
                   <div>
-                    <label className="block text-xs font-semibold text-zinc-400 mb-1.5">URL o Archivo Multimedia</label>
-                    <input 
-                      type="url" 
-                      value={url}
-                      onChange={(e) => setUrl(e.target.value)}
-                      className="w-full rounded-xl border-zinc-800 border bg-black text-white px-3.5 py-2.5 text-sm focus:ring-2 outline-none mb-2"
-                      style={{ ['--tw-ring-color' as any]: configPrimaryColor }}
-                      placeholder="https://youtube.com/... o URL de imagen"
-                    />
+                    <label className="block text-xs font-semibold text-zinc-400 mb-1.5">Foto o Video (Seleccionar desde Carpeta)</label>
                     
-                    <div className="text-center text-zinc-600 text-xs my-1">ó subir desde carpeta</div>
-
-                    <label className="cursor-pointer bg-zinc-950 hover:bg-zinc-800/80 text-zinc-300 w-full px-4 py-3 rounded-xl border border-dashed border-zinc-700 hover:border-zinc-500 transition-colors flex items-center justify-center gap-2 text-xs font-semibold">
-                      <Upload className="w-4 h-4 text-zinc-400" />
-                      <span>Seleccionar Archivo Local</span>
-                      <input 
-                        type="file" 
-                        accept="image/*,video/*"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            const reader = new FileReader();
-                            reader.onload = (ev) => {
-                              setUrl(ev.target?.result as string);
-                            };
-                            reader.readAsDataURL(file);
-                          }
-                        }}
-                        className="hidden"
-                      />
-                    </label>
+                    {url ? (
+                      <div className="relative rounded-xl overflow-hidden border border-zinc-700 bg-black p-2 flex items-center gap-3">
+                        {type === 'training' && url.startsWith('data:video') ? (
+                          <video src={url} className="w-20 h-16 object-cover rounded-lg" controls />
+                        ) : (
+                          <img src={url} alt="Vista previa" className="w-20 h-16 object-cover rounded-lg border border-zinc-800" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-white truncate">{title || 'Archivo seleccionado'}</p>
+                          <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1 mt-0.5">
+                            ✓ Imagen lista para publicar
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <label className="cursor-pointer bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[11px] font-bold px-2.5 py-1.5 rounded-lg transition-colors">
+                            Cambiar
+                            <input 
+                              type="file" 
+                              accept="image/*,video/*"
+                              onChange={handleMediaFileUpload}
+                              className="hidden"
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setUrl('')}
+                            className="bg-red-500/20 hover:bg-red-500/30 text-red-300 text-[11px] font-bold px-2.5 py-1.5 rounded-lg transition-colors"
+                          >
+                            Quitar
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <label className="cursor-pointer bg-zinc-950 hover:bg-zinc-800/80 text-zinc-300 w-full p-5 rounded-xl border-2 border-dashed border-zinc-700 hover:border-zinc-500 transition-all flex flex-col items-center justify-center gap-2 text-center group">
+                        <div 
+                          className="w-12 h-12 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110"
+                          style={{ backgroundColor: `rgba(${primaryRgbObj.r}, ${primaryRgbObj.g}, ${primaryRgbObj.b}, 0.15)` }}
+                        >
+                          <Upload className="w-6 h-6" style={{ color: configPrimaryColor }} />
+                        </div>
+                        <span className="text-xs font-bold text-white">Haz clic para abrir tu carpeta y elegir la foto</span>
+                        <span className="text-[11px] text-zinc-500">Admite fotos (JPG, PNG, WEBP) o videos cortos</span>
+                        <input 
+                          type="file" 
+                          accept="image/*,video/*"
+                          onChange={handleMediaFileUpload}
+                          className="hidden"
+                        />
+                      </label>
+                    )}
                   </div>
 
                   <div>
@@ -1651,7 +1824,7 @@ export function AdminPanel() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 
                 {/* Logo Uploader */}
-                <div className="flex flex-col items-center justify-center p-4 bg-black rounded-2xl border border-zinc-800 text-center space-y-3">
+                <div className="flex flex-col items-center justify-center p-5 bg-black rounded-2xl border border-zinc-800 text-center space-y-3">
                   <div 
                     className="w-24 h-24 rounded-2xl bg-zinc-900 border-2 flex items-center justify-center overflow-hidden p-2 relative shadow-inner"
                     style={{ borderColor: configPrimaryColor }}
@@ -1665,16 +1838,27 @@ export function AdminPanel() {
                     )}
                   </div>
 
-                  <label className="cursor-pointer bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition-colors shadow">
-                    <span>Subir Logo Oficial</span>
-                    <input 
-                      type="file" 
-                      accept="image/*"
-                      onChange={handleLogoUpload}
-                      className="hidden"
-                    />
-                  </label>
-                  <span className="text-[10px] text-zinc-500">Extrae colores automáticamente</span>
+                  <div className="flex items-center gap-2">
+                    <label className="cursor-pointer bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition-colors shadow">
+                      <span>{configLogoUrl ? 'Cambiar Logo' : 'Subir Logo Oficial'}</span>
+                      <input 
+                        type="file" 
+                        accept="image/*"
+                        onChange={handleLogoUpload}
+                        className="hidden"
+                      />
+                    </label>
+                    {configLogoUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setConfigLogoUrl('')}
+                        className="text-xs text-red-400 hover:text-red-300 bg-zinc-900 border border-zinc-800 px-2.5 py-2 rounded-xl"
+                      >
+                        Quitar
+                      </button>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-zinc-500">Seleccionar desde tu carpeta (PNG, JPG, SVG)</span>
                 </div>
 
                 {/* Primary & Accent Color Pickers */}
@@ -1894,16 +2078,119 @@ export function AdminPanel() {
                   />
                 </div>
 
+                {/* Hero Background Image Uploader */}
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-400 mb-1.5">URL de Fondo del Banner</label>
-                  <input 
-                    type="url" 
-                    value={configHeroBgUrl}
-                    onChange={e => setConfigHeroBgUrl(e.target.value)}
-                    className="w-full rounded-xl border-zinc-800 border bg-black text-white px-4 py-2.5 text-sm focus:ring-2 outline-none"
-                    style={{ ['--tw-ring-color' as any]: configPrimaryColor }}
-                    placeholder="https://images.unsplash.com/photo-..."
-                  />
+                  <label className="block text-xs font-semibold text-zinc-400 mb-1.5">Foto de Fondo del Banner (Desde Carpeta)</label>
+                  {configHeroBgUrl ? (
+                    <div className="relative rounded-xl overflow-hidden border border-zinc-700 bg-black p-2 flex items-center gap-3">
+                      <img src={configHeroBgUrl} alt="Fondo Banner" className="w-16 h-12 object-cover rounded-lg border border-zinc-800" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-white truncate">Fondo Personalizado</p>
+                        <span className="text-[10px] text-emerald-400 font-semibold">✓ Imagen cargada</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <label className="cursor-pointer bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-[11px] font-bold px-2.5 py-1.5 rounded-lg transition-colors">
+                          Cambiar
+                          <input 
+                            type="file" 
+                            accept="image/*"
+                            onChange={handleHeroBgUpload}
+                            className="hidden"
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setConfigHeroBgUrl('')}
+                          className="bg-red-500/20 hover:bg-red-500/30 text-red-300 text-[11px] font-bold px-2.5 py-1.5 rounded-lg transition-colors"
+                        >
+                          Quitar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <label className="cursor-pointer bg-zinc-950 hover:bg-zinc-800/80 text-zinc-300 w-full p-3 rounded-xl border border-dashed border-zinc-700 hover:border-zinc-500 transition-all flex items-center justify-center gap-2 text-xs font-bold">
+                      <Upload className="w-4 h-4 text-zinc-400" />
+                      <span>Elegir Fondo desde Carpeta</span>
+                      <input 
+                        type="file" 
+                        accept="image/*"
+                        onChange={handleHeroBgUpload}
+                        className="hidden"
+                      />
+                    </label>
+                  )}
+                </div>
+
+                {/* Main Team Official Photo Uploader */}
+                <div className="md:col-span-2 bg-black/60 rounded-2xl p-4 border border-zinc-800 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="block text-xs font-bold text-white">Foto Oficial del Equipo Principal (Portada Inicio)</label>
+                      <p className="text-[11px] text-zinc-400">Esta fotografía grupal se lucirá en el centro del inicio junto al logo del club.</p>
+                    </div>
+                    <span 
+                      className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border"
+                      style={{ 
+                        backgroundColor: `rgba(${primaryRgbObj.r}, ${primaryRgbObj.g}, ${primaryRgbObj.b}, 0.15)`,
+                        borderColor: `rgba(${primaryRgbObj.r}, ${primaryRgbObj.g}, ${primaryRgbObj.b}, 0.3)`,
+                        color: configPrimaryColor
+                      }}
+                    >
+                      Plantel Principal
+                    </span>
+                  </div>
+
+                  {configMainTeamImageUrl ? (
+                    <div className="relative rounded-xl overflow-hidden border border-zinc-700 bg-zinc-950 p-2.5 flex flex-col sm:flex-row items-center gap-4">
+                      <img 
+                        src={configMainTeamImageUrl} 
+                        alt="Foto Oficial Equipo" 
+                        className="w-full sm:w-48 h-28 object-cover rounded-lg border border-zinc-800 shadow-md" 
+                      />
+                      <div className="flex-1 min-w-0 text-center sm:text-left">
+                        <p className="text-sm font-bold text-white">Foto Oficial del Equipo Principal Cargada</p>
+                        <p className="text-xs text-zinc-400 mt-0.5">Se exhibe como imagen de portada estelar en la pantalla de inicio.</p>
+                        <span className="inline-block mt-2 text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                          ✓ Lista para la afición y miembros
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="cursor-pointer bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition-colors shadow">
+                          Cambiar Foto
+                          <input 
+                            type="file" 
+                            accept="image/*"
+                            onChange={handleMainTeamImageUpload}
+                            className="hidden"
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setConfigMainTeamImageUrl('')}
+                          className="bg-red-500/20 hover:bg-red-500/30 text-red-300 text-xs font-bold px-3 py-2 rounded-xl transition-colors"
+                        >
+                          Quitar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <label className="cursor-pointer bg-zinc-950 hover:bg-zinc-800/80 text-zinc-300 w-full p-6 rounded-xl border-2 border-dashed border-zinc-700 hover:border-zinc-500 transition-all flex flex-col items-center justify-center gap-2 text-center group">
+                      <div 
+                        className="w-12 h-12 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110"
+                        style={{ backgroundColor: `rgba(${primaryRgbObj.r}, ${primaryRgbObj.g}, ${primaryRgbObj.b}, 0.15)` }}
+                      >
+                        <Upload className="w-6 h-6" style={{ color: configPrimaryColor }} />
+                      </div>
+                      <span className="text-xs font-bold text-white">Haz clic aquí para seleccionar la foto oficial del equipo desde tu carpeta</span>
+                      <span className="text-[11px] text-zinc-500">Formato horizontal recomendado (PNG, JPG, WEBP)</span>
+                      <input 
+                        type="file" 
+                        accept="image/*"
+                        onChange={handleMainTeamImageUpload}
+                        className="hidden"
+                      />
+                    </label>
+                  )}
                 </div>
               </div>
             </div>

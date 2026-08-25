@@ -17,6 +17,7 @@ export interface ClubSettings {
   heroTitle?: string;
   heroSubtitle?: string;
   heroBgUrl?: string;
+  mainTeamImageUrl?: string; // Foto oficial del equipo principal
   ctaButtonText?: string;
   
   // Announcement bar
