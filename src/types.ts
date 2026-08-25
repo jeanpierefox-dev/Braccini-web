@@ -58,6 +58,9 @@ export interface ClubComment {
   rating?: number;
   userId?: string;
   createdAt: any;
+  adminReply?: string;
+  adminRepliedAt?: any;
+  adminRepliedBy?: string;
 }
 
 export interface UserProfile {
@@ -67,9 +70,17 @@ export interface UserProfile {
   name: string;
   photoURL: string;
   role: UserRole;
-  clubRole?: 'entrenador' | 'jugador' | 'otro';
+  clubRole?: 'entrenador' | 'jugador' | 'director' | 'otro';
   
-  // Ficha General Deportiva y Corporativa
+  // Ficha General como Director / Presidente del Club (Solo Admin)
+  executiveRole?: string; // ej. Presidente del Club, Director Deportivo, Gerente General
+  institutionalBio?: string; // Mensaje / Visión de la Dirección
+  tenurePeriod?: string; // ej. Gestión 2024 - 2028
+  officePhone?: string;
+  officeEmail?: string;
+  officeLocation?: string;
+
+  // Ficha Deportiva y Corporativa (Solo Jugadores y Entrenadores)
   dni?: string;
   category?: string;
   height?: string;

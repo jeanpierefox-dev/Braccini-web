@@ -126,7 +126,7 @@ export function Navigation() {
                     }`}
                     style={currentHash === '#profile' ? { color: 'var(--club-primary, #3b82f6)' } : {}}
                   >
-                    <UserIcon className="w-4 h-4" /> Mi Ficha
+                    <UserIcon className="w-4 h-4" /> {role === 'admin' ? 'Ficha de Dirección' : 'Mi Ficha'}
                   </a>
                   
                   {role === 'admin' && (
@@ -318,7 +318,7 @@ export function Navigation() {
                     style={currentHash === '#profile' ? { borderLeft: '4px solid var(--club-primary, #2563eb)' } : {}}
                   >
                     <UserIcon className="w-5 h-5" style={{ color: 'var(--club-primary, #3b82f6)' }} />
-                    <span>Mi Ficha Deportiva</span>
+                    <span>{role === 'admin' ? 'Ficha de Dirección del Club' : 'Mi Ficha Deportiva'}</span>
                   </a>
 
                   {role === 'admin' && (

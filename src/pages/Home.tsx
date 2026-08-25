@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 
 export function Home() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const settings = useSettings();
   const { isTrialActive, startTrial, daysRemaining, currentDay } = useVisitorTrial();
   const [showLogin, setShowLogin] = useState(false);
@@ -33,10 +33,15 @@ export function Home() {
   const accentColor = settings.accentColor || '#f59e0b';
   const accentRgb = settings.accentRgb || '245, 158, 11';
 
-  // Listen to users count in real-time
+  // Listen to users count in real-time (Strictly excluding Admin directors)
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'users'), (snapshot) => {
-      setRegisteredPlayersCount(snapshot.size);
+      // Exclude Admin role from athletes count
+      const athleteCount = snapshot.docs.filter(d => {
+        const data = d.data();
+        return data.role !== 'admin' && data.clubRole !== 'entrenador';
+      }).length;
+      setRegisteredPlayersCount(athleteCount);
     }, (err) => {
       console.warn("Could not count registered players:", err);
     });
@@ -49,7 +54,7 @@ export function Home() {
   };
 
   const displayedAthletesCount = settings.statsAutoCountPlayers !== false && registeredPlayersCount !== null
-    ? `${registeredPlayersCount} Registrados`
+    ? `${registeredPlayersCount} Atletas`
     : (settings.statsAthletes || '120+');
   
   return (
@@ -143,7 +148,7 @@ export function Home() {
                       href="#profile"
                       className="inline-flex items-center gap-2 bg-zinc-900/90 text-zinc-300 hover:text-white px-6 py-3.5 rounded-xl text-sm font-semibold transition-colors border border-zinc-800 hover:border-zinc-700 min-h-[48px]"
                     >
-                      Mi Ficha Deportiva
+                      {role === 'admin' ? 'Ficha de Dirección del Club' : 'Mi Ficha Deportiva'}
                     </a>
                   </>
                 )}
