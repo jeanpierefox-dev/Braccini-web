@@ -119,6 +119,36 @@ export interface MediaItem {
   description: string;
   url: string;
   type: MediaType;
-  createdBy: string;
+  createdBy?: string;
+  likesCount?: number;
   createdAt: any;
+}
+
+export interface PublicationComment {
+  id?: string;
+  mediaId: string;
+  authorName: string;
+  authorRole: 'admin' | 'atleta' | 'entrenador' | 'socio' | 'publico';
+  userId?: string;
+  userPhoto?: string;
+  message: string;
+  createdAt: any;
+  likes?: number;
+  adminReply?: string;
+  adminRepliedAt?: any;
+}
+
+export interface DirectInquiryMessage {
+  id?: string;
+  inquiryId?: string;
+  senderName: string;
+  senderRole: 'visitante' | 'atleta' | 'socio' | 'admin';
+  senderId?: string;
+  senderEmail?: string;
+  senderPhone?: string;
+  message: string;
+  category?: 'inscripciones' | 'horarios' | 'pagos' | 'general' | 'entrenamientos';
+  status?: 'abierto' | 'respondido' | 'cerrado';
+  createdAt: any;
+  replyTo?: string;
 }
