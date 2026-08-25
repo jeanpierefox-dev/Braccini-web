@@ -1,1 +1,100 @@
 @import "tailwindcss";
+
+:root {
+  --club-primary: #2563eb;
+  --club-primary-rgb: 37, 99, 235;
+  --club-accent: #f59e0b;
+  --club-accent-rgb: 245, 158, 11;
+}
+
+/* Dynamic theme helper classes */
+.bg-club-primary {
+  background-color: var(--club-primary, #2563eb);
+}
+
+.text-club-primary {
+  color: var(--club-primary, #2563eb);
+}
+
+.border-club-primary {
+  border-color: var(--club-primary, #2563eb);
+}
+
+.bg-club-primary-10 {
+  background-color: rgba(var(--club-primary-rgb, 37, 99, 235), 0.1);
+}
+
+.bg-club-primary-20 {
+  background-color: rgba(var(--club-primary-rgb, 37, 99, 235), 0.2);
+}
+
+.border-club-primary-30 {
+  border-color: rgba(var(--club-primary-rgb, 37, 99, 235), 0.3);
+}
+
+.shadow-club {
+  box-shadow: 0 10px 25px -5px rgba(var(--club-primary-rgb, 37, 99, 235), 0.3);
+}
+
+.text-club-accent {
+  color: var(--club-accent, #f59e0b);
+}
+
+.bg-club-accent {
+  background-color: var(--club-accent, #f59e0b);
+}
+
+.bg-club-accent-10 {
+  background-color: rgba(var(--club-accent-rgb, 245, 158, 11), 0.1);
+}
+
+.border-club-accent-30 {
+  border-color: rgba(var(--club-accent-rgb, 245, 158, 11), 0.3);
+}
+
+/* Custom device simulator styling */
+.device-frame-mobile {
+  width: 375px;
+  max-width: 100%;
+  height: 667px;
+  border: 10px solid #27272a;
+  border-radius: 36px;
+  overflow-y: auto;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+}
+
+.device-frame-tablet {
+  width: 768px;
+  max-width: 100%;
+  height: 720px;
+  border: 12px solid #27272a;
+  border-radius: 28px;
+  overflow-y: auto;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+}
+
+.device-frame-pc {
+  width: 100%;
+  max-width: 1200px;
+  height: 720px;
+  border: 4px solid #27272a;
+  border-radius: 16px;
+  overflow-y: auto;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+}
+
+/* Responsive custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #09090b;
+}
+::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--club-primary, #3b82f6);
+}

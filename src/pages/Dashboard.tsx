@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { MediaItem } from '../types';
-import { Video, Image as ImageIcon, Calendar } from 'lucide-react';
+import { useSettings } from '../hooks/useSettings';
+import { useAuth } from '../contexts/AuthContext';
+import { useVisitorTrial } from '../hooks/useVisitorTrial';
+import { Video, Image as ImageIcon, Calendar, Sparkles, UserPlus, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -10,6 +13,14 @@ export function Dashboard() {
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
+  const settings = useSettings();
+  const { user } = useAuth();
+  const { isTrialActive, daysRemaining, currentDay } = useVisitorTrial();
+
+  const primaryColor = settings.primaryColor || '#2563eb';
+  const primaryRgb = settings.primaryRgb || '37, 99, 235';
+  const accentColor = settings.accentColor || '#f59e0b';
+  const accentRgb = settings.accentRgb || '245, 158, 11';
 
   useEffect(() => {
     const q = query(collection(db, 'media'), orderBy('createdAt', 'desc'));
@@ -33,59 +44,130 @@ export function Dashboard() {
     ? media 
     : media.filter(m => m.type === filter);
 
-  // Helper to determine if URL is likely a video
   const isVideo = (url: string) => {
     return url.includes('youtube.com') || url.includes('youtu.be') || url.includes('vimeo.com') || url.match(/\.(mp4|webm|ogg)$/i);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-black to-zinc-900 text-slate-100 py-10">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-black text-slate-100 py-8 sm:py-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
         
-        <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
+        {/* Visitor 7-Day Trial Banner */}
+        {!user && isTrialActive && (
+          <div 
+            className="p-5 sm:p-6 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-4 shadow-2xl backdrop-blur-xl animate-in slide-in-from-top-3"
+            style={{
+              backgroundColor: `rgba(${accentRgb}, 0.1)`,
+              borderColor: `rgba(${accentRgb}, 0.35)`
+            }}
+          >
+            <div className="flex items-center gap-3.5">
+              <div 
+                className="w-12 h-12 rounded-2xl flex items-center justify-center text-white shrink-0 shadow-lg font-black"
+                style={{ backgroundColor: accentColor }}
+              >
+                <Sparkles className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm sm:text-base font-black text-white">
+                    Pase de Visita Gratuito Activo (Día {currentDay} de 7)
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    <Clock className="w-3 h-3" /> {daysRemaining} {daysRemaining === 1 ? 'día restante' : 'días restantes'}
+                  </span>
+                </div>
+                <p className="text-xs text-zinc-300 mt-0.5">
+                  Estás visualizando todos los contenidos y rutinas técnicas del club en modo visitante.
+                </p>
+              </div>
+            </div>
+
+            <a 
+              href="#home"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 text-white px-5 py-2.5 rounded-xl font-bold text-xs shadow-lg uppercase tracking-wider transition-transform hover:scale-105 shrink-0"
+              style={{
+                backgroundColor: primaryColor,
+                boxShadow: `0 4px 14px rgba(${primaryRgb}, 0.4)`
+              }}
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>Inscribirme al Club</span>
+            </a>
+          </div>
+        )}
+
+        {/* Header and Filter */}
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-white mb-2">Contenido Exclusivo</h1>
-            <p className="text-zinc-400">Galería de entrenamientos y jugadores para miembros.</p>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: primaryColor }} />
+              <span className="text-xs font-bold uppercase tracking-widest text-zinc-400">Material de Entrenamiento</span>
+            </div>
+            <h1 className="text-2xl sm:text-4xl font-black text-white">Contenido y Rutinas Técnicas</h1>
+            <p className="text-sm text-zinc-400 mt-1">Galería de entrenamientos, tácticas de saque, recepción y partidos del club.</p>
           </div>
           
-          <div className="flex bg-zinc-900/60 rounded-lg shadow-inner p-1 border border-zinc-800 backdrop-blur-md">
-            {['all', 'training', 'player', 'general'].map((type) => (
-              <button
-                key={type}
-                onClick={() => setFilter(type)}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  filter === type 
-                    ? 'bg-blue-500/20 text-blue-400 shadow border border-blue-500/30' 
-                    : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
-                }`}
-              >
-                {type === 'all' ? 'Todos' : 
-                 type === 'training' ? 'Entrenamientos' : 
-                 type === 'player' ? 'Jugadores' : 'General'}
-              </button>
-            ))}
+          {/* Responsive Filter Buttons */}
+          <div className="flex flex-wrap bg-zinc-900/80 rounded-xl p-1 border border-zinc-800 backdrop-blur-md self-start sm:self-auto">
+            {[
+              { id: 'all', label: 'Todos' },
+              { id: 'training', label: 'Entrenamientos' },
+              { id: 'player', label: 'Jugadores' },
+              { id: 'general', label: 'General' }
+            ].map((tab) => {
+              const isActive = filter === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setFilter(tab.id)}
+                  className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all ${
+                    isActive 
+                      ? 'text-white shadow-md' 
+                      : 'text-zinc-400 hover:text-white hover:bg-zinc-800/60'
+                  }`}
+                  style={isActive ? {
+                    backgroundColor: primaryColor,
+                    boxShadow: `0 4px 14px rgba(${primaryRgb}, 0.3)`
+                  } : {}}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
         {loading ? (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {[1, 2, 3, 4, 5, 6].map(i => (
-              <div key={i} className="bg-slate-200 rounded-2xl h-72 animate-pulse" />
+              <div key={i} className="bg-zinc-900/50 rounded-2xl h-72 animate-pulse border border-zinc-800" />
             ))}
           </div>
         ) : filteredMedia.length === 0 ? (
-          <div className="bg-zinc-900/40 backdrop-blur-xl rounded-2xl border border-zinc-800 p-16 text-center shadow-inner">
-            <div className="bg-zinc-800 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 border border-zinc-700">
-              <ImageIcon className="w-10 h-10 text-zinc-400" />
+          <div className="bg-zinc-900/40 backdrop-blur-xl rounded-2xl border border-zinc-800 p-12 sm:p-20 text-center">
+            <div 
+              className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 border"
+              style={{ 
+                backgroundColor: `rgba(${primaryRgb}, 0.1)`,
+                borderColor: `rgba(${primaryRgb}, 0.2)`
+              }}
+            >
+              <ImageIcon className="w-8 h-8" style={{ color: primaryColor }} />
             </div>
-            <h3 className="text-xl font-medium text-white mb-2">No hay contenido aún</h3>
-            <p className="text-zinc-400">Los administradores aún no han subido material de este tipo.</p>
+            <h3 className="text-lg font-bold text-white mb-1">No hay contenido disponible</h3>
+            <p className="text-sm text-zinc-400 max-w-md mx-auto">
+              El cuerpo técnico aún no ha publicado material en esta categoría.
+            </p>
           </div>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredMedia.map((item) => (
-              <div key={item.id} className="bg-zinc-900 rounded-2xl border border-zinc-800 overflow-hidden shadow-xl hover:border-blue-500/50 transition-colors group">
-                <div className="aspect-video relative bg-zinc-900 overflow-hidden">
+              <div 
+                key={item.id} 
+                className="bg-zinc-900/80 rounded-2xl border border-zinc-800/80 overflow-hidden shadow-xl transition-all duration-300 hover:border-zinc-700 group flex flex-col"
+              >
+                <div className="aspect-video relative bg-zinc-950 overflow-hidden">
                   {isVideo(item.url) ? (
                     item.url.includes('youtube.com') || item.url.includes('youtu.be') ? (
                       <iframe 
@@ -101,22 +183,37 @@ export function Dashboard() {
                       <video src={item.url} controls className="w-full h-full object-cover" />
                     )
                   ) : (
-                    <img src={item.url} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                    <img 
+                      src={item.url} 
+                      alt={item.title} 
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                    />
                   )}
                   
-                  <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded border border-white/10 text-[10px] font-bold uppercase tracking-widest text-white flex items-center gap-1.5 shadow-lg">
-                    {isVideo(item.url) ? <Video className="w-3.5 h-3.5 text-blue-400" /> : <ImageIcon className="w-3.5 h-3.5 text-red-400" />}
-                    {item.type === 'training' ? 'Entrenamiento' : item.type === 'player' ? 'Jugador' : 'General'}
+                  <div 
+                    className="absolute top-3 left-3 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider text-white flex items-center gap-1.5 shadow-lg backdrop-blur-md"
+                    style={{
+                      backgroundColor: item.type === 'training' ? primaryColor : accentColor
+                    }}
+                  >
+                    {isVideo(item.url) ? <Video className="w-3.5 h-3.5" /> : <ImageIcon className="w-3.5 h-3.5" />}
+                    <span>{item.type === 'training' ? 'Entrenamiento' : item.type === 'player' ? 'Jugador' : 'General'}</span>
                   </div>
                 </div>
                 
-                <div className="p-5">
-                  <h3 className="text-lg font-bold text-white mb-1">{item.title}</h3>
-                  <div className="flex items-center gap-1.5 text-xs text-zinc-400 mb-3">
-                    <Calendar className="w-3.5 h-3.5" />
-                    {item.createdAt ? format(item.createdAt.toDate(), "d 'de' MMMM, yyyy", { locale: es }) : 'Subiendo...'}
+                <div className="p-5 flex-1 flex flex-col justify-between">
+                  <div>
+                    <h3 className="text-base sm:text-lg font-bold text-white mb-1.5 leading-snug group-hover:text-zinc-200 transition-colors">
+                      {item.title}
+                    </h3>
+                    <div className="flex items-center gap-1.5 text-xs text-zinc-400 mb-3">
+                      <Calendar className="w-3.5 h-3.5" />
+                      <span>{item.createdAt ? format(item.createdAt.toDate(), "d 'de' MMMM, yyyy", { locale: es }) : 'Reciente'}</span>
+                    </div>
+                    <p className="text-zinc-400 text-xs sm:text-sm line-clamp-3 leading-relaxed">
+                      {item.description}
+                    </p>
                   </div>
-                  <p className="text-zinc-400 text-sm line-clamp-2">{item.description}</p>
                 </div>
               </div>
             ))}
@@ -126,3 +223,4 @@ export function Dashboard() {
     </div>
   );
 }
+

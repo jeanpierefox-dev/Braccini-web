@@ -31,5 +31,8 @@ service cloud.firestore {
     match /payments/{paymentId} {
       allow read, write: if true;
     }
+    match /comments/{commentId} {
+      allow read, write: if true;
+    }
   }
 }
