@@ -56,6 +56,7 @@ import { es } from 'date-fns/locale';
 import { useSettings } from '../hooks/useSettings';
 import { extractColorsFromImage, ExtractedColors, hexToRgb } from '../utils/colorExtractor';
 import { DevicePreviewModal } from '../components/DevicePreviewModal';
+import { compressImageFile } from '../utils/imageCompressor';
 
 export function AdminPanel() {
   const { user, role } = useAuth();
@@ -68,6 +69,7 @@ export function AdminPanel() {
   const [url, setUrl] = useState('');
   const [type, setType] = useState<'training' | 'player' | 'general'>('training');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isQuickUploadingMedia, setIsQuickUploadingMedia] = useState(false);
   const [error, setError] = useState('');
 
   // Data State
@@ -432,6 +434,37 @@ export function AdminPanel() {
         setUrl(ev.target?.result as string);
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  // Direct fast upload for training photos (bypasses form fields)
+  const handleQuickMediaDirectUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsQuickUploadingMedia(true);
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (!file.type.startsWith('image/')) continue;
+        const compressedBase64 = await compressImageFile(file, 1280, 900, 0.85);
+        const fileNameClean = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+        const autoTitle = fileNameClean ? (fileNameClean.charAt(0).toUpperCase() + fileNameClean.slice(1)) : 'Entrenamiento';
+
+        await addDoc(collection(db, 'media'), {
+          title: autoTitle,
+          description: '',
+          url: compressedBase64,
+          type: 'training',
+          createdAt: serverTimestamp()
+        });
+      }
+    } catch (err: any) {
+      console.error('Error in quick media upload:', err);
+      alert('Error al subir fotos rápidamente: ' + (err.message || 'Error desconocido'));
+    } finally {
+      setIsQuickUploadingMedia(false);
+      e.target.value = '';
     }
   };
 
@@ -901,11 +934,58 @@ export function AdminPanel() {
         {/* TAB 1: MEDIA */}
         {activeTab === 'media' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in">
-            <div className="lg:col-span-1">
+            <div className="lg:col-span-1 space-y-6">
+              {/* Option 1: Fast 1-Click Upload (No title/desc/category required) */}
+              <div className="bg-gradient-to-br from-zinc-900/90 to-zinc-950 rounded-2xl border border-zinc-700/60 p-5 shadow-xl">
+                <div className="flex items-center gap-2.5 mb-2">
+                  <div 
+                    className="w-8 h-8 rounded-lg flex items-center justify-center"
+                    style={{ backgroundColor: `rgba(${primaryRgbObj.r}, ${primaryRgbObj.g}, ${primaryRgbObj.b}, 0.2)` }}
+                  >
+                    <Sparkles className="w-4 h-4" style={{ color: configPrimaryColor }} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-white leading-tight">Subida Rápida (1 Clic)</h4>
+                    <p className="text-[11px] text-zinc-400">Fotos de entrenamientos directo de tu carpeta</p>
+                  </div>
+                </div>
+                <p className="text-xs text-zinc-400 mb-3">
+                  Sube una o varias fotos a la vez sin necesidad de escribir título, categoría ni descripción.
+                </p>
+                <label className={`cursor-pointer w-full py-3 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 border transition-all text-white ${
+                  isQuickUploadingMedia ? 'opacity-50 pointer-events-none' : 'hover:scale-[1.02]'
+                }`}
+                style={{
+                  backgroundColor: `rgba(${primaryRgbObj.r}, ${primaryRgbObj.g}, ${primaryRgbObj.b}, 0.25)`,
+                  borderColor: configPrimaryColor
+                }}>
+                  {isQuickUploadingMedia ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                      <span>Comprimiendo y Subiendo...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-4 h-4" style={{ color: configPrimaryColor }} />
+                      <span>Elegir Foto(s) de Entreno</span>
+                    </>
+                  )}
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    multiple
+                    disabled={isQuickUploadingMedia}
+                    onChange={handleQuickMediaDirectUpload}
+                    className="hidden" 
+                  />
+                </label>
+              </div>
+
+              {/* Option 2: Detailed Media Form */}
               <div className="bg-zinc-900/70 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6 shadow-xl">
                 <h3 className="text-base sm:text-lg font-bold text-white mb-4 border-b border-zinc-800 pb-3 flex items-center gap-2">
                   <Plus className="w-4 h-4" style={{ color: configPrimaryColor }} />
-                  <span>Nuevo Contenido</span>
+                  <span>Publicación Detallada</span>
                 </h3>
                 
                 {error && (
