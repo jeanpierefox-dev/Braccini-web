@@ -296,41 +296,10 @@ export function ClubCommentsSection() {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               
-              {/* Role Selector */}
-              <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1.5">
-                  ¿Quién eres?
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { id: 'publico', label: 'Público / Fan' },
-                    { id: 'atleta', label: 'Atleta' },
-                    { id: 'entrenador', label: 'Entrenador' },
-                  ].map(tab => (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => setUserRoleType(tab.id as any)}
-                      className={`py-2 px-2 text-center rounded-xl text-xs font-bold transition-all border ${
-                        userRoleType === tab.id
-                          ? 'text-white shadow-md border-transparent'
-                          : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white'
-                      }`}
-                      style={userRoleType === tab.id ? {
-                        backgroundColor: primaryColor,
-                        boxShadow: `0 4px 12px rgba(${primaryRgb}, 0.3)`
-                      } : {}}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
               {/* Author Name */}
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1.5">
-                  Nombre o Alias
+                  Nombre o Alias (Opcional)
                 </label>
                 <input 
                   type="text" 
@@ -338,8 +307,7 @@ export function ClubCommentsSection() {
                   onChange={e => setName(e.target.value)}
                   className="w-full bg-black border border-zinc-800 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2"
                   style={{ ['--tw-ring-color' as any]: primaryColor }}
-                  placeholder="Ej. Familia Rodríguez / Sergio (Jugador)"
-                  required
+                  placeholder="Tu nombre o apodo (ej. Carlos M.)"
                 />
               </div>
 

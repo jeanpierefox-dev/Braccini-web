@@ -12,7 +12,7 @@ import {
   setDoc 
 } from 'firebase/firestore';
 import { db, firebaseConfig } from '../lib/firebase';
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps, getApp, deleteApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 import { useAuth } from '../contexts/AuthContext';
 import { UserProfile, MediaItem, UserRole, Payment, ClubSettings, ThemeMode, ClubComment } from '../types';
@@ -540,24 +540,36 @@ export function AdminPanel() {
     }
 
     setIsAddingUser(true);
-    const generatedEmail = `${newUserUsername.toLowerCase().trim()}@club.com`;
+    const cleanUsername = newUserUsername.toLowerCase().trim();
+    const generatedEmail = `${cleanUsername}@club.com`;
+    const appName = `SecondaryApp_${Date.now()}`;
+    let createdUid: string | null = null;
+    let secondaryAppInstance: any = null;
 
     try {
-      const secondaryApp = initializeApp(firebaseConfig, 'SecondaryApp');
-      const secondaryAuth = getAuth(secondaryApp);
-      
-      const userCredential = await createUserWithEmailAndPassword(
-        secondaryAuth,
-        generatedEmail,
-        newUserPassword
-      );
+      // 1. Intentar creación en Firebase Auth vía secondary app
+      try {
+        secondaryAppInstance = initializeApp(firebaseConfig, appName);
+        const secondaryAuth = getAuth(secondaryAppInstance);
+        
+        const userCredential = await createUserWithEmailAndPassword(
+          secondaryAuth,
+          generatedEmail,
+          newUserPassword
+        );
+        createdUid = userCredential.user.uid;
+      } catch (authErr: any) {
+        console.warn("Firebase Auth secondary creation failed, saving to Firestore directly:", authErr);
+        // Si el usuario ya existe en Auth o falla la creación remota, generamos un doc id único
+        createdUid = `user_${cleanUsername}_${Date.now()}`;
+      }
 
-      const newUid = userCredential.user.uid;
-
-      await setDoc(doc(db, 'users', newUid), {
-        name: newUserName,
+      // 2. Guardar ficha del usuario en Firestore
+      await setDoc(doc(db, 'users', createdUid), {
+        name: newUserName.trim(),
         email: generatedEmail,
-        username: newUserUsername.toLowerCase().trim(),
+        username: cleanUsername,
+        password: newUserPassword, // Permite inicio de sesión local para socios y jugadores
         role: 'member',
         clubRole: newUserClubRole,
         photoURL: '',
@@ -568,11 +580,18 @@ export function AdminPanel() {
       setNewUserPassword('');
       setNewUserName('');
       setNewUserClubRole('jugador');
-      alert(`¡Usuario @${newUserUsername} creado exitosamente!`);
+      alert(`¡Usuario @${cleanUsername} registrado exitosamente! Ya puede iniciar sesión con su usuario y contraseña.`);
     } catch (err: any) {
-      console.error(err);
-      alert('Error al crear usuario: ' + (err.message || 'Error desconocido'));
+      console.error("Error al registrar usuario:", err);
+      alert('Error al registrar usuario: ' + (err.message || 'Error desconocido'));
     } finally {
+      if (secondaryAppInstance) {
+        try {
+          await deleteApp(secondaryAppInstance);
+        } catch (e) {
+          // Ignorar limpieza
+        }
+      }
       setIsAddingUser(false);
     }
   };

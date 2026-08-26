@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, signInWithEmailAndPassword } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 
 export type UserRole = 'admin' | 'member' | 'guest';
@@ -88,40 +88,99 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginWithCredentials = async (username: string, pass: string) => {
     if (isSigningIn) return;
     setIsSigningIn(true);
+    const cleanUser = username.trim().toLowerCase();
+
     try {
-      if (username === 'adm' && pass === '1234') {
-        const mockAdmin = {
+      // 1. Super Admin shortcut
+      if (cleanUser === 'adm' && pass === '1234') {
+        const mockAdmin: AppUser = {
           uid: 'mock-admin-123',
           email: 'admin@voleyclub.com',
           displayName: 'Administrador Principal',
           photoURL: null,
-          role: 'admin'
         };
-        localStorage.setItem('mockUser', JSON.stringify(mockAdmin));
+        localStorage.setItem('mockUser', JSON.stringify({ ...mockAdmin, role: 'admin' }));
         setUser(mockAdmin);
         setRole('admin');
         
-        // Try to create the user doc in firestore for consistency
         try {
           await setDoc(doc(db, 'users', mockAdmin.uid), {
             email: mockAdmin.email,
             name: mockAdmin.displayName,
             role: 'admin',
             createdAt: serverTimestamp()
-          });
+          }, { merge: true });
         } catch (e) {
           console.warn("Could not save mock user to Firestore:", e);
         }
-      } else {
-        const email = `${username.trim().toLowerCase()}@voleyclub.app`;
-        await signInWithEmailAndPassword(auth, email, pass);
+        return;
       }
+
+      // 2. Try Firebase Auth (Primary with @voleyclub.app or @club.com)
+      const primaryEmail = cleanUser.includes('@') ? cleanUser : `${cleanUser}@voleyclub.app`;
+      const fallbackEmail = `${cleanUser}@club.com`;
+
+      try {
+        await signInWithEmailAndPassword(auth, primaryEmail, pass);
+        return;
+      } catch (authErr: any) {
+        if (authErr.code === 'auth/wrong-password') {
+          throw authErr;
+        }
+        // Try fallback club.com email
+        if (!cleanUser.includes('@')) {
+          try {
+            await signInWithEmailAndPassword(auth, fallbackEmail, pass);
+            return;
+          } catch (fbErr: any) {
+            if (fbErr.code === 'auth/wrong-password') {
+              throw fbErr;
+            }
+          }
+        }
+      }
+
+      // 3. Fallback to Firestore users directory lookup
+      const usersQuery = query(
+        collection(db, 'users'),
+        where('username', '==', cleanUser)
+      );
+      const userSnap = await getDocs(usersQuery);
+
+      if (!userSnap.empty) {
+        const userDoc = userSnap.docs[0];
+        const userData = userDoc.data();
+
+        // Check if stored password hash/plain matches or if created via admin
+        if (userData.password && userData.password !== pass) {
+          throw new Error('wrong-password');
+        }
+
+        const appUser: AppUser = {
+          uid: userDoc.id,
+          email: userData.email || `${cleanUser}@club.com`,
+          displayName: userData.name || cleanUser,
+          photoURL: userData.photoURL || null
+        };
+
+        localStorage.setItem('mockUser', JSON.stringify({
+          ...appUser,
+          role: userData.role || 'member'
+        }));
+
+        setUser(appUser);
+        setRole((userData.role as UserRole) || 'member');
+        return;
+      }
+
+      throw new Error('user-not-found');
+
     } catch (error: any) {
       console.error("Error signing in:", error);
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-        alert("Usuario o contraseña incorrectos.");
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential' || error.message === 'wrong-password' || error.message === 'user-not-found') {
+        alert("Usuario o contraseña incorrectos. Verifique sus credenciales.");
       } else {
-        alert("Ocurrió un error al iniciar sesión.");
+        alert("Ocurrió un error al iniciar sesión: " + (error.message || 'Error'));
       }
     } finally {
       setIsSigningIn(false);

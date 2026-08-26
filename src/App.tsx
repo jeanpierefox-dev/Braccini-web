@@ -9,6 +9,7 @@ import { useSettings } from './hooks/useSettings';
 import { useVisitorTrial } from './hooks/useVisitorTrial';
 import { Navigation } from './components/Navigation';
 import { InitialLoader } from './components/InitialLoader';
+import { DirectInquiryChat } from './components/DirectInquiryChat';
 import { Home } from './pages/Home';
 import { Dashboard } from './pages/Dashboard';
 import { AdminPanel } from './pages/AdminPanel';
@@ -47,6 +48,7 @@ function AppRouter() {
     <div className="font-sans min-h-screen bg-black text-slate-100 print:bg-white selection:bg-blue-600 selection:text-white">
       <Navigation />
       {renderContent()}
+      <DirectInquiryChat />
     </div>
   );
 }
