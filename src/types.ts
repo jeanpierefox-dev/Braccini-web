@@ -134,6 +134,10 @@ export interface UserProfile {
   playerSignature?: string;
   guardianSignature?: string;
   
+  // Exoneración / Beca de Cuotas Mensuales
+  isFeeExempt?: boolean;
+  feeExemptReason?: string;
+
   createdAt?: any;
 }
 
@@ -164,10 +168,15 @@ export interface MonthlyFeeRecord {
   userId: string;
   userName: string;
   category?: string;
-  month: string; // Enero, Febrero, Marzo, etc.
-  year: number;
+  userCategory?: string;
+  month?: string; // Enero, Febrero, Marzo, etc.
+  year?: number;
+  monthPeriod?: string; // ej. 2026-03
+  monthName?: string; // ej. Marzo 2026
   amount: number;
-  status: 'paid' | 'pending';
+  paidAmount?: number;
+  dueDate?: string;
+  status: 'paid' | 'pending' | 'al_dia' | 'pendiente' | 'parcial' | 'exonerado';
   paidAt?: any;
   paymentMethod?: string; // Efectivo, Yape/Plin, Transferencia, Tarjeta
   receiptNumber?: string;

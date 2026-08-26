@@ -1,0 +1,102 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile with role, membership and athletic data",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "username": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "member", "guest"] },
+        "clubRole": { "type": "string" },
+        "membershipStatus": { "type": "string" },
+        "membershipPlan": { "type": "string" },
+        "membershipEndDate": { "type": "string" },
+        "hasAccessToPrivatePlatform": { "type": "boolean" },
+        "isFeeExempt": { "type": "boolean" },
+        "feeExemptReason": { "type": "string" }
+      },
+      "required": ["name", "email", "role"]
+    },
+    "MonthlyFeeRecord": {
+      "title": "MonthlyFeeRecord",
+      "description": "Monthly fee payment records and balances for players",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "monthPeriod": { "type": "string" },
+        "monthName": { "type": "string" },
+        "amount": { "type": "number" },
+        "paidAmount": { "type": "number" },
+        "status": { "type": "string" }
+      },
+      "required": ["userId", "userName", "monthPeriod", "amount"]
+    },
+    "Payment": {
+      "title": "Payment",
+      "description": "General club payment transaction",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "concept": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string" }
+      },
+      "required": ["userId", "userName", "concept", "amount"]
+    },
+    "UniformOrder": {
+      "title": "UniformOrder",
+      "description": "Club uniform tailoring order",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "size": { "type": "string" },
+        "batchName": { "type": "string" }
+      },
+      "required": ["userId", "userName", "size", "batchName"]
+    },
+    "ClubSettings": {
+      "title": "ClubSettings",
+      "description": "Global settings for club identity, branding, and rates",
+      "type": "object",
+      "properties": {
+        "appName": { "type": "string" },
+        "primaryColor": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/settings/{docId}": {
+      "schema": "ClubSettings",
+      "description": "Club general configurations"
+    },
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Member, player and admin profiles"
+    },
+    "/monthly_fees/{feeId}": {
+      "schema": "MonthlyFeeRecord",
+      "description": "Player monthly fees and balances"
+    },
+    "/payments/{paymentId}": {
+      "schema": "Payment",
+      "description": "Issued receipts and treasury transactions"
+    },
+    "/uniform_orders/{orderId}": {
+      "schema": "UniformOrder",
+      "description": "Batch uniform tailoring orders"
+    },
+    "/media/{mediaId}": {
+      "schema": "MediaItem",
+      "description": "Multimedia content and training videos"
+    },
+    "/comments/{commentId}": {
+      "schema": "ClubComment",
+      "description": "Community wall comments and ratings"
+    }
+  }
+}
