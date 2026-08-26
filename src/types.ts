@@ -1,5 +1,6 @@
 export type UserRole = 'admin' | 'member' | 'guest';
-export type MediaType = 'training' | 'player' | 'general';
+export type MediaType = 'training' | 'player' | 'general' | 'entrenos' | 'partidos' | 'paseos';
+export type MediaCategory = 'entrenos' | 'partidos' | 'paseos' | 'institucional' | 'general';
 export type ThemeMode = 'dark' | 'midnight' | 'club-contrast' | 'slate';
 
 export interface ClubSettings {
@@ -19,6 +20,21 @@ export interface ClubSettings {
   heroBgUrl?: string;
   mainTeamImageUrl?: string; // Foto oficial del equipo principal
   ctaButtonText?: string;
+  
+  // Misión y Visión Institucional (Editable y Eliminable solo por Admin)
+  showMissionVision?: boolean;
+  missionTitle?: string;
+  missionText?: string;
+  visionTitle?: string;
+  visionText?: string;
+  valuesTitle?: string;
+  valuesList?: string[];
+  
+  // Precios de Planes y Membresías por tiempo limitado (1, 3 y 12 meses)
+  plan1MonthPrice?: number;
+  plan3MonthsPrice?: number;
+  plan12MonthsPrice?: number;
+  membershipPaymentInfo?: string;
   
   // Announcement bar
   showAnnouncement?: boolean;
@@ -74,6 +90,15 @@ export interface UserProfile {
   role: UserRole;
   clubRole?: 'entrenador' | 'jugador' | 'director' | 'otro';
   
+  // Control de Acceso por Tiempo Limitado (1, 3, 12 meses)
+  membershipStatus?: 'active' | 'expired' | 'none';
+  membershipPlan?: '1_month' | '3_months' | '12_months' | 'custom' | 'unlimited';
+  membershipStartDate?: string;
+  membershipEndDate?: string;
+  membershipFeePaid?: number;
+  membershipDurationMonths?: number;
+  hasAccessToPrivatePlatform?: boolean;
+
   // Ficha General como Director / Presidente del Club (Solo Admin)
   executiveRole?: string; // ej. Presidente del Club, Director Deportivo, Gerente General
   institutionalBio?: string; // Mensaje / Visión de la Dirección
@@ -168,6 +193,8 @@ export interface MediaItem {
   description: string;
   url: string;
   type: MediaType;
+  category?: MediaCategory;
+  tag?: string;
   createdBy?: string;
   likesCount?: number;
   createdAt: any;

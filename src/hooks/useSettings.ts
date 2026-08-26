@@ -20,6 +20,28 @@ const defaultSettings: ClubSettings = {
   ctaButtonText: 'Acceso a Miembros',
   showAnnouncement: true,
   announcementText: '🔥 ¡Temporada 2026 Abierta! Consulta los horarios de entrenamiento y cuotas en el panel.',
+  
+  // Misión y Visión Institucional
+  showMissionVision: true,
+  missionTitle: 'Nuestra Misión Institucional',
+  missionText: 'Formar atletas de voleibol con los más altos estándares técnicos, tácticos y físicos, inculcando valores de disciplina, resiliencia y compañerismo que los potencien como deportistas de élite y personas íntegras.',
+  visionTitle: 'Nuestra Visión de Futuro',
+  visionText: 'Consolidarnos como el club formativo y competitivo líder a nivel nacional e internacional, reconocido por la excelencia en su metodología deportiva, su cuerpo técnico especializado y el desarrollo integral de sus deportistas.',
+  valuesTitle: 'Pilares y Valores del Club',
+  valuesList: [
+    'Disciplina y Constancia Deportiva',
+    'Trabajo en Equipo y Solidaridad',
+    'Excelencia Técnica y Mentalidad Ganadora',
+    'Respeto, Juego Limpio e Integridad',
+    'Pasión y Pertenencia Institucional'
+  ],
+  
+  // Membresías por tiempo limitado (1, 3 y 12 meses)
+  plan1MonthPrice: 80,
+  plan3MonthsPrice: 220,
+  plan12MonthsPrice: 750,
+  membershipPaymentInfo: 'Yape / Plin al 987-654-321 (Titanes Voley Club) o Transferencia BCP Cta: 191-8829103-0-45',
+
   statsChampionships: '15+',
   statsAthletes: '120',
   statsCategories: '8',
@@ -27,8 +49,10 @@ const defaultSettings: ClubSettings = {
   contactPhone: '+51 987 654 321',
   contactEmail: 'contacto@titanesvoley.com',
   contactLocation: 'Polideportivo Central, Cancha Principal',
+  contactWhatsApp: '+51 987 654 321',
   socialInstagram: 'https://instagram.com',
   socialFacebook: 'https://facebook.com',
+  socialTikTok: 'https://tiktok.com',
   autoColorExtracted: true
 };
 

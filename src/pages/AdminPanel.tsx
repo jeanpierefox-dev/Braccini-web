@@ -18,6 +18,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { 
   UserProfile, 
   MediaItem, 
+  MediaCategory,
   UserRole, 
   Payment, 
   ClubSettings, 
@@ -70,7 +71,8 @@ import {
   FileSpreadsheet,
   Layers,
   X,
-  Edit2
+  Edit2,
+  DollarSign
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -89,6 +91,7 @@ export function AdminPanel() {
   const [description, setDescription] = useState('');
   const [url, setUrl] = useState('');
   const [type, setType] = useState<'training' | 'player' | 'general'>('training');
+  const [mediaCategory, setMediaCategory] = useState<MediaCategory>('entrenos');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isQuickUploadingMedia, setIsQuickUploadingMedia] = useState(false);
   const [error, setError] = useState('');
@@ -196,6 +199,19 @@ export function AdminPanel() {
   const [configSocialFacebook, setConfigSocialFacebook] = useState('');
   const [configSocialTikTok, setConfigSocialTikTok] = useState('');
 
+  // Misión y Visión
+  const [configShowMissionVision, setConfigShowMissionVision] = useState(true);
+  const [configMissionTitle, setConfigMissionTitle] = useState('Nuestra Misión');
+  const [configMissionText, setConfigMissionText] = useState('Formar atletas íntegros de alto rendimiento en voleibol...');
+  const [configVisionTitle, setConfigVisionTitle] = useState('Nuestra Visión');
+  const [configVisionText, setConfigVisionText] = useState('Ser la institución deportiva de voleibol referente en formación...');
+
+  // Planes de Membresía y Acceso
+  const [configPlan1MonthPrice, setConfigPlan1MonthPrice] = useState(45);
+  const [configPlan3MonthsPrice, setConfigPlan3MonthsPrice] = useState(120);
+  const [configPlan12MonthsPrice, setConfigPlan12MonthsPrice] = useState(420);
+  const [configMembershipPaymentInfo, setConfigMembershipPaymentInfo] = useState('Yape / Plin al 987 654 321 o BCP 191-12345678-0-12');
+
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [isExtractingColors, setIsExtractingColors] = useState(false);
   const [extractedPalette, setExtractedPalette] = useState<string[]>([]);
@@ -233,6 +249,17 @@ export function AdminPanel() {
     if (appSettings.socialInstagram) setConfigSocialInstagram(appSettings.socialInstagram);
     if (appSettings.socialFacebook) setConfigSocialFacebook(appSettings.socialFacebook);
     if (appSettings.socialTikTok) setConfigSocialTikTok(appSettings.socialTikTok);
+
+    if (typeof appSettings.showMissionVision === 'boolean') setConfigShowMissionVision(appSettings.showMissionVision);
+    if (appSettings.missionTitle) setConfigMissionTitle(appSettings.missionTitle);
+    if (appSettings.missionText) setConfigMissionText(appSettings.missionText);
+    if (appSettings.visionTitle) setConfigVisionTitle(appSettings.visionTitle);
+    if (appSettings.visionText) setConfigVisionText(appSettings.visionText);
+
+    if (typeof appSettings.plan1MonthPrice === 'number') setConfigPlan1MonthPrice(appSettings.plan1MonthPrice);
+    if (typeof appSettings.plan3MonthsPrice === 'number') setConfigPlan3MonthsPrice(appSettings.plan3MonthsPrice);
+    if (typeof appSettings.plan12MonthsPrice === 'number') setConfigPlan12MonthsPrice(appSettings.plan12MonthsPrice);
+    if (appSettings.membershipPaymentInfo) setConfigMembershipPaymentInfo(appSettings.membershipPaymentInfo);
   }, [appSettings]);
 
   // Real-time Firestore Listeners
@@ -579,6 +606,7 @@ export function AdminPanel() {
         description,
         url,
         type,
+        category: mediaCategory,
         createdBy: user?.uid || 'admin',
         createdAt: serverTimestamp(),
       });
@@ -587,6 +615,7 @@ export function AdminPanel() {
       setDescription('');
       setUrl('');
       setType('training');
+      setMediaCategory('entrenos');
     } catch (err: any) {
       setError(err.message || 'Error al subir multimedia');
     } finally {
@@ -601,6 +630,49 @@ export function AdminPanel() {
       } catch (err: any) {
         console.error(err);
       }
+    }
+  };
+
+  // Assign time-limited membership access (1, 3, 12 months, unlimited, or revoke)
+  const handleSetUserMembership = async (userId: string, months: number | 'unlimited' | 'revoke') => {
+    try {
+      if (months === 'revoke') {
+        await updateDoc(doc(db, 'users', userId), {
+          membershipStatus: 'expired',
+          hasAccessToPrivatePlatform: false,
+          membershipPlan: 'free',
+          membershipEndDate: new Date(Date.now() - 86400000).toISOString()
+        });
+        alert('Acceso a plataforma privada revocado.');
+        return;
+      }
+
+      let endDate: Date;
+      let planName = 'custom';
+
+      if (months === 'unlimited') {
+        endDate = new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000); // 10 years
+        planName = 'unlimited';
+      } else {
+        const currentUser = users.find(u => u.id === userId);
+        const currentEnd = currentUser?.membershipEndDate ? new Date(currentUser.membershipEndDate) : new Date();
+        const baseDate = currentEnd > new Date() ? currentEnd : new Date();
+        
+        endDate = new Date(baseDate.getTime() + months * 30 * 24 * 60 * 60 * 1000);
+        planName = months === 1 ? '1_month' : (months === 3 ? '3_months' : '12_months');
+      }
+
+      await updateDoc(doc(db, 'users', userId), {
+        membershipStatus: 'active',
+        hasAccessToPrivatePlatform: true,
+        membershipPlan: planName,
+        membershipEndDate: endDate.toISOString()
+      });
+
+      alert(`¡Membresía actualizada! Acceso habilitado hasta ${format(endDate, "dd/MM/yyyy", { locale: es })}.`);
+    } catch (err: any) {
+      console.error("Error setting membership:", err);
+      alert('Error al actualizar membresía: ' + err.message);
     }
   };
 
@@ -1051,6 +1123,15 @@ export function AdminPanel() {
         socialInstagram: configSocialInstagram.trim(),
         socialFacebook: configSocialFacebook.trim(),
         socialTikTok: configSocialTikTok.trim(),
+        showMissionVision: configShowMissionVision,
+        missionTitle: configMissionTitle.trim(),
+        missionText: configMissionText.trim(),
+        visionTitle: configVisionTitle.trim(),
+        visionText: configVisionText.trim(),
+        plan1MonthPrice: Number(configPlan1MonthPrice) || 45,
+        plan3MonthsPrice: Number(configPlan3MonthsPrice) || 120,
+        plan12MonthsPrice: Number(configPlan12MonthsPrice) || 420,
+        membershipPaymentInfo: configMembershipPaymentInfo.trim(),
       };
 
       await setDoc(doc(db, 'settings', 'general'), settingsData, { merge: true });
@@ -1355,6 +1436,22 @@ export function AdminPanel() {
                       <option value="training">Entrenamiento (Video / Foto)</option>
                       <option value="player">Jugador (Foto / Perfil)</option>
                       <option value="general">General / Club</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-zinc-400 mb-1.5">Categoría de Publicación</label>
+                    <select
+                      value={mediaCategory}
+                      onChange={(e) => setMediaCategory(e.target.value as any)}
+                      className="w-full rounded-xl border-zinc-800 border bg-black text-white px-3.5 py-2.5 text-sm focus:ring-2 outline-none"
+                      style={{ ['--tw-ring-color' as any]: configPrimaryColor }}
+                    >
+                      <option value="entrenos">🏋️ Entrenamientos y Técnicas</option>
+                      <option value="partidos">🏐 Partidos y Torneos Oficiales</option>
+                      <option value="paseos">🌴 Paseos y Confraternidad</option>
+                      <option value="institucional">🏛️ Institucional y Comunicados</option>
+                      <option value="general">⭐ General</option>
                     </select>
                   </div>
 
@@ -1891,6 +1988,7 @@ export function AdminPanel() {
                       <tr>
                         <th className="px-5 py-3.5">Integrante</th>
                         <th className="px-5 py-3.5">Ficha y Rol</th>
+                        <th className="px-5 py-3.5">Membresía / Acceso</th>
                         <th className="px-5 py-3.5">Permisos</th>
                         <th className="px-5 py-3.5 text-right">Acción</th>
                       </tr>
@@ -1898,11 +1996,13 @@ export function AdminPanel() {
                     <tbody className="divide-y divide-zinc-800/60 text-xs sm:text-sm">
                       {users.length === 0 ? (
                         <tr>
-                          <td colSpan={4} className="p-8 text-center text-zinc-500">No hay usuarios registrados.</td>
+                          <td colSpan={5} className="p-8 text-center text-zinc-500">No hay usuarios registrados.</td>
                         </tr>
                       ) : users.map(u => {
                         const isUserAdmin = u.role === 'admin' || u.clubRole === 'director';
                         const isUserCoach = u.clubRole === 'entrenador';
+                        const isAccessActive = u.membershipStatus === 'active' || isUserAdmin || (u.membershipEndDate && new Date(u.membershipEndDate) > new Date());
+                        const expiryDateFormatted = u.membershipEndDate ? format(new Date(u.membershipEndDate), "dd/MM/yyyy", { locale: es }) : null;
 
                         return (
                           <tr key={u.id} className="hover:bg-zinc-800/30 transition-colors">
@@ -1913,7 +2013,7 @@ export function AdminPanel() {
                             <td className="px-5 py-4 text-zinc-300">
                               {isUserAdmin ? (
                                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                                  <Shield className="w-3 h-3" /> Ficha de Director (No cuenta como atleta)
+                                  <Shield className="w-3 h-3" /> Ficha de Director
                                 </span>
                               ) : isUserCoach ? (
                                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-500/20 text-blue-300 border border-blue-500/30">
@@ -1927,9 +2027,61 @@ export function AdminPanel() {
                                     color: configPrimaryColor
                                   }}
                                 >
-                                  <UserIcon className="w-3 h-3" /> Jugador / Atleta (Ficha Deportiva)
+                                  <UserIcon className="w-3 h-3" /> Jugador / Atleta
                                 </span>
                               )}
+                            </td>
+                            <td className="px-5 py-4">
+                              <div className="space-y-1.5">
+                                {isUserAdmin ? (
+                                  <span className="text-[11px] font-bold text-emerald-400">Acceso Ilimitado (Admin)</span>
+                                ) : (
+                                  <>
+                                    <div className="flex items-center gap-1.5">
+                                      <span className={`inline-block w-2 h-2 rounded-full ${isAccessActive ? 'bg-emerald-400' : 'bg-red-400'}`} />
+                                      <span className={`text-[11px] font-bold ${isAccessActive ? 'text-emerald-400' : 'text-red-400'}`}>
+                                        {isAccessActive ? (expiryDateFormatted ? `Activo hasta ${expiryDateFormatted}` : 'Activo') : 'Vencido / Sin acceso'}
+                                      </span>
+                                    </div>
+                                    <div className="flex flex-wrap gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSetUserMembership(u.id, 1)}
+                                        className="text-[10px] font-bold px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 transition-colors"
+                                        title="Habilitar acceso por 1 Mes"
+                                      >
+                                        +1 Mes
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSetUserMembership(u.id, 3)}
+                                        className="text-[10px] font-bold px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 transition-colors"
+                                        title="Habilitar acceso por 3 Meses"
+                                      >
+                                        +3 Meses
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSetUserMembership(u.id, 12)}
+                                        className="text-[10px] font-bold px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 transition-colors"
+                                        title="Habilitar acceso por 12 Meses"
+                                      >
+                                        +12 Meses
+                                      </button>
+                                      {isAccessActive && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleSetUserMembership(u.id, 'revoke')}
+                                          className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 transition-colors"
+                                          title="Revocar acceso inmediatamente"
+                                        >
+                                          Revocar
+                                        </button>
+                                      )}
+                                    </div>
+                                  </>
+                                )}
+                              </div>
                             </td>
                             <td className="px-5 py-4">
                               <span className={`inline-block px-2.5 py-0.5 rounded text-xs font-bold uppercase tracking-wider ${
@@ -3359,6 +3511,147 @@ export function AdminPanel() {
                     placeholder="Av. Principal 123, Complejo Deportivo"
                   />
                 </div>
+              </div>
+            </div>
+
+            {/* SECTION 6: MISIÓN Y VISIÓN INSTITUCIONAL */}
+            <div className="bg-zinc-900/70 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6 sm:p-8 shadow-xl space-y-5">
+              <div className="border-b border-zinc-800 pb-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5" style={{ color: configPrimaryColor }} />
+                  <h3 className="font-bold text-white text-base sm:text-lg">Misión y Visión Institucional</h3>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={configShowMissionVision} 
+                    onChange={e => setConfigShowMissionVision(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                </label>
+              </div>
+
+              <p className="text-xs text-zinc-400">
+                Configura los pilares del club. Si desactivas el interruptor, la sección no se mostrará en la página pública. Solo el Administrador puede modificar estos textos.
+              </p>
+
+              {configShowMissionVision && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="p-4 rounded-xl bg-black border border-zinc-800 space-y-3">
+                    <label className="block text-xs font-semibold text-zinc-400">Título de la Misión</label>
+                    <input 
+                      type="text" 
+                      value={configMissionTitle}
+                      onChange={e => setConfigMissionTitle(e.target.value)}
+                      className="w-full rounded-xl border-zinc-800 border bg-zinc-900 text-white px-3.5 py-2 text-sm focus:ring-2 outline-none"
+                      style={{ ['--tw-ring-color' as any]: configPrimaryColor }}
+                      placeholder="Nuestra Misión"
+                    />
+                    <label className="block text-xs font-semibold text-zinc-400">Texto de la Misión</label>
+                    <textarea 
+                      rows={4}
+                      value={configMissionText}
+                      onChange={e => setConfigMissionText(e.target.value)}
+                      className="w-full rounded-xl border-zinc-800 border bg-zinc-900 text-white px-3.5 py-2 text-sm focus:ring-2 outline-none resize-none"
+                      style={{ ['--tw-ring-color' as any]: configPrimaryColor }}
+                      placeholder="Describe la misión formativa y deportiva..."
+                    />
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-black border border-zinc-800 space-y-3">
+                    <label className="block text-xs font-semibold text-zinc-400">Título de la Visión</label>
+                    <input 
+                      type="text" 
+                      value={configVisionTitle}
+                      onChange={e => setConfigVisionTitle(e.target.value)}
+                      className="w-full rounded-xl border-zinc-800 border bg-zinc-900 text-white px-3.5 py-2 text-sm focus:ring-2 outline-none"
+                      style={{ ['--tw-ring-color' as any]: configPrimaryColor }}
+                      placeholder="Nuestra Visión"
+                    />
+                    <label className="block text-xs font-semibold text-zinc-400">Texto de la Visión</label>
+                    <textarea 
+                      rows={4}
+                      value={configVisionText}
+                      onChange={e => setConfigVisionText(e.target.value)}
+                      className="w-full rounded-xl border-zinc-800 border bg-zinc-900 text-white px-3.5 py-2 text-sm focus:ring-2 outline-none resize-none"
+                      style={{ ['--tw-ring-color' as any]: configPrimaryColor }}
+                      placeholder="Describe la visión futura del club..."
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* SECTION 7: PLANES DE MEMBRESÍA Y PAGOS */}
+            <div className="bg-zinc-900/70 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6 sm:p-8 shadow-xl space-y-5">
+              <div className="border-b border-zinc-800 pb-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <DollarSign className="w-5 h-5" style={{ color: configPrimaryColor }} />
+                  <h3 className="font-bold text-white text-base sm:text-lg">Tarifas de Membresías y Acceso a la Plataforma</h3>
+                </div>
+                <span className="text-xs text-emerald-400 font-bold">1, 3 y 12 Meses</span>
+              </div>
+
+              <p className="text-xs text-zinc-400">
+                Define el costo en Soles (S/) de las membresías por tiempo limitado que los socios y jugadores abonarán para acceder al contenido privado del club (entrenamientos, pizarra táctica, videos).
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-4 rounded-xl bg-black border border-zinc-800 space-y-2">
+                  <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Plan 1 Mes (S/)</span>
+                  <input 
+                    type="number" 
+                    min="0"
+                    step="1"
+                    value={configPlan1MonthPrice}
+                    onChange={e => setConfigPlan1MonthPrice(Number(e.target.value))}
+                    className="w-full rounded-xl border-zinc-800 border bg-zinc-900 text-white px-3.5 py-2 text-sm font-mono font-bold focus:ring-2 outline-none"
+                    style={{ ['--tw-ring-color' as any]: configPrimaryColor }}
+                  />
+                  <span className="text-[11px] text-zinc-500">Acceso durante 30 días calendario</span>
+                </div>
+
+                <div className="p-4 rounded-xl bg-black border border-zinc-800 space-y-2">
+                  <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Plan 3 Meses / Trimestre (S/)</span>
+                  <input 
+                    type="number" 
+                    min="0"
+                    step="1"
+                    value={configPlan3MonthsPrice}
+                    onChange={e => setConfigPlan3MonthsPrice(Number(e.target.value))}
+                    className="w-full rounded-xl border-zinc-800 border bg-zinc-900 text-white px-3.5 py-2 text-sm font-mono font-bold focus:ring-2 outline-none"
+                    style={{ ['--tw-ring-color' as any]: configPrimaryColor }}
+                  />
+                  <span className="text-[11px] text-zinc-500">Acceso durante 90 días calendario</span>
+                </div>
+
+                <div className="p-4 rounded-xl bg-black border border-zinc-800 space-y-2">
+                  <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Plan Anual / 12 Meses (S/)</span>
+                  <input 
+                    type="number" 
+                    min="0"
+                    step="1"
+                    value={configPlan12MonthsPrice}
+                    onChange={e => setConfigPlan12MonthsPrice(Number(e.target.value))}
+                    className="w-full rounded-xl border-zinc-800 border bg-zinc-900 text-white px-3.5 py-2 text-sm font-mono font-bold focus:ring-2 outline-none"
+                    style={{ ['--tw-ring-color' as any]: configPrimaryColor }}
+                  />
+                  <span className="text-[11px] text-zinc-500">Acceso total durante 365 días</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-zinc-400 mb-1.5">Instrucciones de Pago / Números de Cuenta / Billeteras Digitales</label>
+                <input 
+                  type="text" 
+                  value={configMembershipPaymentInfo}
+                  onChange={e => setConfigMembershipPaymentInfo(e.target.value)}
+                  className="w-full rounded-xl border-zinc-800 border bg-black text-white px-4 py-2.5 text-sm focus:ring-2 outline-none"
+                  style={{ ['--tw-ring-color' as any]: configPrimaryColor }}
+                  placeholder="Ej. Yape / Plin al 987 654 321 o Transferencia BCP Cta. 191-12345678-0-12"
+                />
+                <p className="text-[11px] text-zinc-500 mt-1">Este texto aparecerá en la sección de plataforma privada para orientar a los socios.</p>
               </div>
             </div>
 
