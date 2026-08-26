@@ -1,6 +1,6 @@
 {
   "name": "VoleyClub CMS",
-  "description": "Plataforma de gestión de contenido multimedia para club deportivo de voleibol, con panel de administración y control de acceso (RBAC).",
+  "description": "Plataforma integral para club de voleibol con gestión de tesorería, pedidos de uniformes para confección, carnet deportivo interactivo, fichas de registro en PDF A4 y control de publicaciones.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

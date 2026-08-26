@@ -49,6 +49,7 @@ export interface ClubSettings {
   socialTikTok?: string;
   
   autoColorExtracted?: boolean;
+  hiddenDefaultPublications?: string[];
 }
 
 export interface ClubComment {
@@ -97,7 +98,55 @@ export interface UserProfile {
   bloodType?: string;
   jerseyNumber?: string;
   position?: string;
+
+  // Apoderado / Tutor Legal (para menores de edad)
+  isMinor?: boolean;
+  isUnderAge?: boolean;
+  guardianName?: string;
+  guardianDni?: string;
+  guardianPhone?: string;
+  guardianRelationship?: string;
+  playerSignature?: string;
+  guardianSignature?: string;
   
+  createdAt?: any;
+}
+
+export interface UniformOrder {
+  id?: string;
+  userId: string;
+  userName: string;
+  userCategory?: string;
+  itemType?: string;
+  type?: 'completo' | 'camiseta'; // Completo (Camiseta + Short) o Sólo Camiseta
+  size: string; // Tallas: 12, 14, 16, S, M, L, XL, XXL
+  number?: string;
+  jerseyNumber?: string; // Número
+  alias?: string; // Nombre / Alias en espalda
+  nameOnBack?: string;
+  batchName: string; // Nombre de lote para confección (ej. "Lote Marzo 2026")
+  price?: number;
+  isPaid?: boolean;
+  paymentStatus?: 'pagado' | 'pendiente';
+  status?: string;
+  orderStatus?: 'pendiente' | 'confeccion' | 'entregado';
+  notes?: string;
+  createdAt?: any;
+}
+
+export interface MonthlyFeeRecord {
+  id?: string;
+  userId: string;
+  userName: string;
+  category?: string;
+  month: string; // Enero, Febrero, Marzo, etc.
+  year: number;
+  amount: number;
+  status: 'paid' | 'pending';
+  paidAt?: any;
+  paymentMethod?: string; // Efectivo, Yape/Plin, Transferencia, Tarjeta
+  receiptNumber?: string;
+  notes?: string;
   createdAt: any;
 }
 

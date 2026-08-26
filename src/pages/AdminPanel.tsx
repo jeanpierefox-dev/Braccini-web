@@ -15,7 +15,22 @@ import { db, firebaseConfig } from '../lib/firebase';
 import { initializeApp, getApps, getApp, deleteApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 import { useAuth } from '../contexts/AuthContext';
-import { UserProfile, MediaItem, UserRole, Payment, ClubSettings, ThemeMode, ClubComment } from '../types';
+import { 
+  UserProfile, 
+  MediaItem, 
+  UserRole, 
+  Payment, 
+  ClubSettings, 
+  ThemeMode, 
+  ClubComment,
+  UniformOrder,
+  MonthlyFeeRecord
+} from '../types';
+import { 
+  generateUniformBatchPDF,
+  generatePlayerFeeStatementPDF,
+  generateGeneralTreasuryReportPDF
+} from '../utils/pdfGenerators';
 import { 
   Upload, 
   Trash2, 
@@ -49,7 +64,13 @@ import {
   Check,
   Send,
   Building2,
-  AlertCircle
+  AlertCircle,
+  Shirt,
+  FileDown,
+  FileSpreadsheet,
+  Layers,
+  X,
+  Edit2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -99,6 +120,40 @@ export function AdminPanel() {
   const [selectedMonth, setSelectedMonth] = useState(() => { 
     const d = new Date(); 
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; 
+  });
+
+  // Uniforms State
+  const [uniformOrders, setUniformOrders] = useState<UniformOrder[]>([]);
+  const [selectedUniformBatch, setSelectedUniformBatch] = useState<string>('Todos los Lotes');
+  const [showUniformModal, setShowUniformModal] = useState(false);
+  const [editingUniformOrder, setEditingUniformOrder] = useState<UniformOrder | null>(null);
+  const [uniformForm, setUniformForm] = useState<Partial<UniformOrder>>({
+    itemType: 'completo',
+    size: 'M',
+    number: '',
+    nameOnBack: '',
+    batchName: 'Lote Apertura 2026',
+    price: 85,
+    isPaid: false,
+    status: 'pendiente',
+    notes: ''
+  });
+
+  // Monthly Fees State
+  const [monthlyFees, setMonthlyFees] = useState<MonthlyFeeRecord[]>([]);
+  const [feeMonthFilter, setFeeMonthFilter] = useState<string>(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  });
+  const [feePlayerFilter, setFeePlayerFilter] = useState<string>('all');
+  const [showFeeModal, setShowFeeModal] = useState(false);
+  const [feeForm, setFeeForm] = useState<Partial<MonthlyFeeRecord>>({
+    monthPeriod: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`,
+    monthName: 'Mes Deportivo',
+    amount: 100,
+    paidAmount: 100,
+    status: 'al_dia',
+    notes: ''
   });
 
   // Comments / Feedback Mailbox State
@@ -224,11 +279,33 @@ export function AdminPanel() {
       console.warn("Firestore listener error (comments):", error);
     });
 
+    // Fetch Uniform Orders
+    const qUniforms = query(collection(db, 'uniform_orders'), orderBy('createdAt', 'desc'));
+    const unUniforms = onSnapshot(qUniforms, (snap) => {
+      const u: UniformOrder[] = [];
+      snap.forEach(d => u.push({ id: d.id, ...d.data() } as UniformOrder));
+      setUniformOrders(u);
+    }, (error) => {
+      console.warn("Firestore listener error (uniform_orders):", error);
+    });
+
+    // Fetch Monthly Fee Records
+    const qFees = query(collection(db, 'monthly_fees'), orderBy('createdAt', 'desc'));
+    const unFees = onSnapshot(qFees, (snap) => {
+      const f: MonthlyFeeRecord[] = [];
+      snap.forEach(d => f.push({ id: d.id, ...d.data() } as MonthlyFeeRecord));
+      setMonthlyFees(f);
+    }, (error) => {
+      console.warn("Firestore listener error (monthly_fees):", error);
+    });
+
     return () => {
       unUsers();
       unMedia();
       unPayments();
       unComments();
+      unUniforms();
+      unFees();
     };
   }, [role]);
 
@@ -649,6 +726,247 @@ export function AdminPanel() {
     } finally {
       setIsAddingPayment(false);
     }
+  };
+
+  // UNIFORM ORDER HANDLERS
+  const handleOpenNewUniformModal = (preselectedUser?: UserProfile) => {
+    if (preselectedUser) {
+      setUniformForm({
+        userId: preselectedUser.id,
+        userName: preselectedUser.name || preselectedUser.email,
+        itemType: 'completo',
+        size: 'M',
+        number: preselectedUser.jerseyNumber || '',
+        nameOnBack: preselectedUser.name?.split(' ')?.[0]?.toUpperCase() || '',
+        batchName: selectedUniformBatch !== 'Todos los Lotes' ? selectedUniformBatch : 'Lote Apertura 2026',
+        price: 85,
+        isPaid: false,
+        status: 'pendiente',
+        notes: ''
+      });
+    } else {
+      const firstPlayer = users[0];
+      setUniformForm({
+        userId: firstPlayer?.id || '',
+        userName: firstPlayer?.name || firstPlayer?.email || '',
+        itemType: 'completo',
+        size: 'M',
+        number: firstPlayer?.jerseyNumber || '',
+        nameOnBack: firstPlayer?.name?.split(' ')?.[0]?.toUpperCase() || '',
+        batchName: selectedUniformBatch !== 'Todos los Lotes' ? selectedUniformBatch : 'Lote Apertura 2026',
+        price: 85,
+        isPaid: false,
+        status: 'pendiente',
+        notes: ''
+      });
+    }
+    setEditingUniformOrder(null);
+    setShowUniformModal(true);
+  };
+
+  const handleEditUniformOrder = (order: UniformOrder) => {
+    setEditingUniformOrder(order);
+    setUniformForm({ ...order });
+    setShowUniformModal(true);
+  };
+
+  const handleSaveUniformOrder = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!uniformForm.userId || !uniformForm.size) {
+      alert('Por favor selecciona un integrante y talla.');
+      return;
+    }
+
+    try {
+      const selectedUserObj = users.find(u => u.id === uniformForm.userId);
+      const userName = selectedUserObj ? (selectedUserObj.name || selectedUserObj.email) : (uniformForm.userName || 'Deportista');
+      
+      const payload: Partial<UniformOrder> = {
+        userId: uniformForm.userId,
+        userName: userName,
+        userCategory: selectedUserObj?.category || 'General',
+        itemType: uniformForm.itemType || 'completo',
+        size: uniformForm.size || 'M',
+        number: uniformForm.number || selectedUserObj?.jerseyNumber || 'S/N',
+        nameOnBack: uniformForm.nameOnBack || userName.split(' ')?.[0]?.toUpperCase() || 'CLUB',
+        batchName: uniformForm.batchName || 'Lote Apertura 2026',
+        price: Number(uniformForm.price) || 85,
+        isPaid: Boolean(uniformForm.isPaid),
+        status: uniformForm.status || 'pendiente',
+        notes: uniformForm.notes || ''
+      };
+
+      if (editingUniformOrder) {
+        await updateDoc(doc(db, 'uniform_orders', editingUniformOrder.id), {
+          ...payload,
+          updatedAt: serverTimestamp()
+        });
+      } else {
+        await addDoc(collection(db, 'uniform_orders'), {
+          ...payload,
+          createdAt: serverTimestamp()
+        });
+      }
+
+      setShowUniformModal(false);
+      setEditingUniformOrder(null);
+    } catch (err: any) {
+      console.error('Error saving uniform order:', err);
+      alert('Error al guardar el pedido de uniforme: ' + err.message);
+    }
+  };
+
+  const handleDeleteUniformOrder = async (orderId: string) => {
+    if (!window.confirm('¿Estás seguro de eliminar este pedido de uniforme?')) return;
+    try {
+      await deleteDoc(doc(db, 'uniform_orders', orderId));
+    } catch (err) {
+      console.error(err);
+      alert('No se pudo eliminar el pedido.');
+    }
+  };
+
+  const handleToggleUniformPaid = async (order: UniformOrder) => {
+    try {
+      await updateDoc(doc(db, 'uniform_orders', order.id), {
+        isPaid: !order.isPaid
+      });
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDownloadUniformBatchPDF = (targetBatch: string) => {
+    const filtered = targetBatch === 'Todos los Lotes' 
+      ? uniformOrders 
+      : uniformOrders.filter(o => o.batchName === targetBatch);
+
+    if (filtered.length === 0) {
+      alert('No hay pedidos en este lote para exportar.');
+      return;
+    }
+
+    generateUniformBatchPDF(filtered, targetBatch, appSettings);
+  };
+
+  // MONTHLY FEE HANDLERS
+  const handleOpenNewFeeModal = (preselectedUser?: UserProfile) => {
+    const selectedMonthStr = feeMonthFilter;
+    const [y, m] = selectedMonthStr.split('-');
+    const dateObj = new Date(parseInt(y), parseInt(m) - 1, 1);
+    const monthFormatted = format(dateObj, "MMMM yyyy", { locale: es });
+
+    setFeeForm({
+      userId: preselectedUser?.id || users[0]?.id || '',
+      userName: preselectedUser?.name || users[0]?.name || '',
+      monthPeriod: selectedMonthStr,
+      monthName: monthFormatted.charAt(0).toUpperCase() + monthFormatted.slice(1),
+      amount: 100,
+      paidAmount: 100,
+      status: 'al_dia',
+      dueDate: `${y}-${m}-15`,
+      notes: ''
+    });
+    setShowFeeModal(true);
+  };
+
+  const handleSaveMonthlyFee = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!feeForm.userId || !feeForm.amount) {
+      alert('Por favor selecciona un integrante y monto.');
+      return;
+    }
+
+    try {
+      const selectedUserObj = users.find(u => u.id === feeForm.userId);
+      const userName = selectedUserObj ? (selectedUserObj.name || selectedUserObj.email) : 'Deportista';
+      const amt = Number(feeForm.amount) || 0;
+      const paid = Number(feeForm.paidAmount) || 0;
+      
+      let calcStatus: 'al_dia' | 'pendiente' | 'parcial' | 'vencido' = 'al_dia';
+      if (paid >= amt) calcStatus = 'al_dia';
+      else if (paid > 0) calcStatus = 'parcial';
+      else calcStatus = 'pendiente';
+
+      const payload = {
+        userId: feeForm.userId,
+        userName: userName,
+        userCategory: selectedUserObj?.category || 'General',
+        monthPeriod: feeForm.monthPeriod || feeMonthFilter,
+        monthName: feeForm.monthName || 'Mes Deportivo',
+        amount: amt,
+        paidAmount: paid,
+        status: calcStatus,
+        dueDate: feeForm.dueDate || '',
+        paidAt: paid > 0 ? (feeForm.paidAt || format(new Date(), 'yyyy-MM-dd')) : '',
+        notes: feeForm.notes || ''
+      };
+
+      await addDoc(collection(db, 'monthly_fees'), {
+        ...payload,
+        createdAt: serverTimestamp()
+      });
+
+      setShowFeeModal(false);
+    } catch (err: any) {
+      console.error('Error saving fee:', err);
+      alert('Error al registrar cuota: ' + err.message);
+    }
+  };
+
+  const handleQuickGenerateFeesForMonth = async () => {
+    if (!window.confirm(`¿Deseas generar la cuota de S/ 100 para todos los integrantes activos para el mes ${feeMonthFilter}?`)) return;
+
+    try {
+      const [y, m] = feeMonthFilter.split('-');
+      const dateObj = new Date(parseInt(y), parseInt(m) - 1, 1);
+      const monthFormatted = format(dateObj, "MMMM yyyy", { locale: es });
+      const monthTitle = monthFormatted.charAt(0).toUpperCase() + monthFormatted.slice(1);
+
+      let createdCount = 0;
+      for (const u of users) {
+        // Check if fee already exists for this user in this period
+        const existing = monthlyFees.find(f => f.userId === u.id && f.monthPeriod === feeMonthFilter);
+        if (!existing) {
+          await addDoc(collection(db, 'monthly_fees'), {
+            userId: u.id,
+            userName: u.name || u.email,
+            userCategory: u.category || 'General',
+            monthPeriod: feeMonthFilter,
+            monthName: monthTitle,
+            amount: 100,
+            paidAmount: 0,
+            status: 'pendiente',
+            dueDate: `${y}-${m}-15`,
+            createdAt: serverTimestamp()
+          });
+          createdCount++;
+        }
+      }
+
+      alert(`¡Se generaron ${createdCount} cuotas mensuales para el periodo ${monthTitle}!`);
+    } catch (err: any) {
+      console.error(err);
+      alert('Error al generar cuotas masivas: ' + err.message);
+    }
+  };
+
+  const handleDeleteMonthlyFee = async (feeId: string) => {
+    if (!window.confirm('¿Eliminar registro de cuota?')) return;
+    try {
+      await deleteDoc(doc(db, 'monthly_fees', feeId));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDownloadPlayerStatement = (targetUser: UserProfile) => {
+    const userFees = monthlyFees.filter(f => f.userId === targetUser.id);
+    generatePlayerFeeStatementPDF(targetUser, userFees, appSettings);
+  };
+
+  const handleDownloadGeneralTreasury = () => {
+    generateGeneralTreasuryReportPDF(users, monthlyFees, feeMonthFilter, appSettings);
   };
 
   // Reply to comment
@@ -1813,85 +2131,657 @@ export function AdminPanel() {
               </div>
             )}
 
+            {/* TAB 4: MENSUALIDADES (CUOTAS MENSUALES Y REPORTES) */}
             {treasuryView === 'mensualidades' && (
-              <div className="bg-zinc-900/70 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6 shadow-xl space-y-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-4">
-                  <div>
-                    <h3 className="text-base sm:text-lg font-bold text-white">Control de Cuotas Mensuales</h3>
-                    <p className="text-xs text-zinc-400">Monitorea los pagos de los integrantes para cada mes deportivo.</p>
+              <div className="space-y-6">
+                
+                {/* Control Bar */}
+                <div className="bg-zinc-900/80 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6 shadow-xl space-y-4">
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-zinc-800 pb-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
+                        <h3 className="text-base sm:text-lg font-black text-white">Control y Resumen de Cuotas Mensuales</h3>
+                      </div>
+                      <p className="text-xs text-zinc-400 mt-1">
+                        Controla el saldo de cada deportista (lo que va pagando y lo que falta pagar), emite estados de cuenta por jugador y descarga el reporte general.
+                      </p>
+                    </div>
+
+                    {/* Top Action Buttons */}
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={handleDownloadGeneralTreasury}
+                        className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg transition-transform hover:scale-105"
+                      >
+                        <FileDown className="w-4 h-4" />
+                        <span>Descargar Resumen General (PDF)</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleQuickGenerateFeesForMonth}
+                        className="inline-flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-bold px-4 py-2.5 rounded-xl border border-zinc-700 transition-colors"
+                        title="Genera automáticamente cuotas pendientes para todos los miembros"
+                      >
+                        <Sparkles className="w-4 h-4 text-amber-400" />
+                        <span>Generar Cuotas del Mes</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleOpenNewFeeModal()}
+                        className="inline-flex items-center gap-2 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg transition-transform hover:scale-105"
+                        style={{ backgroundColor: configPrimaryColor }}
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Registrar Cuota</span>
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <label className="text-xs font-semibold text-zinc-400">Seleccionar Mes:</label>
-                    <input 
-                      type="month" 
-                      value={selectedMonth}
-                      onChange={(e) => setSelectedMonth(e.target.value)}
-                      className="bg-black border border-zinc-800 rounded-xl px-3 py-1.5 text-white text-xs focus:ring-2 outline-none"
-                      style={{ ['--tw-ring-color' as any]: configPrimaryColor }}
-                    />
+
+                  {/* Filter Row */}
+                  <div className="flex flex-wrap items-center gap-4 text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="text-zinc-400 font-semibold">Mes Periodo:</span>
+                      <input 
+                        type="month" 
+                        value={feeMonthFilter}
+                        onChange={(e) => setFeeMonthFilter(e.target.value)}
+                        className="bg-black border border-zinc-800 rounded-xl px-3 py-1.5 text-white font-mono outline-none focus:ring-2"
+                        style={{ ['--tw-ring-color' as any]: configPrimaryColor }}
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-zinc-400 font-semibold">Filtrar Atleta:</span>
+                      <select 
+                        value={feePlayerFilter}
+                        onChange={(e) => setFeePlayerFilter(e.target.value)}
+                        className="bg-black border border-zinc-800 rounded-xl px-3 py-1.5 text-white outline-none focus:ring-2 max-w-[200px]"
+                        style={{ ['--tw-ring-color' as any]: configPrimaryColor }}
+                      >
+                        <option value="all">Todos los Integrantes</option>
+                        {users.map(u => (
+                          <option key={u.id} value={u.id}>{u.name || u.email}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {users.map(u => {
-                    const hasPaid = payments.some(p => p.userId === u.id && p.period === selectedMonth && p.concept.includes('Mensual'));
+                {/* Per-Player Financial Balances Card Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {(feePlayerFilter === 'all' ? users : users.filter(u => u.id === feePlayerFilter)).map(u => {
+                    const userFees = monthlyFees.filter(f => f.userId === u.id);
+                    const totalAssigned = userFees.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+                    const totalPaid = userFees.reduce((acc, curr) => acc + (Number(curr.paidAmount) || 0), 0);
+                    const totalPending = Math.max(0, totalAssigned - totalPaid);
+                    const isUpToDate = totalPending === 0 && totalAssigned > 0;
+
                     return (
                       <div 
-                        key={u.id}
-                        className={`p-4 rounded-xl border flex items-center justify-between gap-3 ${
-                          hasPaid ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-zinc-950 border-zinc-800 text-zinc-400'
+                        key={u.id} 
+                        className={`rounded-2xl border p-5 backdrop-blur-xl transition-all ${
+                          isUpToDate 
+                            ? 'bg-emerald-950/20 border-emerald-500/30 shadow-lg shadow-emerald-950/20'
+                            : totalPending > 0
+                              ? 'bg-zinc-900/80 border-red-500/30'
+                              : 'bg-zinc-900/80 border-zinc-800'
                         }`}
                       >
-                        <div>
-                          <h4 className="font-bold text-sm text-white">{u.name || u.email}</h4>
-                          <span className="text-[10px] text-zinc-500 block uppercase font-mono">{u.clubRole || 'Jugador'}</span>
-                        </div>
-                        <div className="text-right">
-                          <span className={`text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${
-                            hasPaid ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-300'
+                        <div className="flex items-start justify-between gap-3 mb-3 border-b border-zinc-800/80 pb-3">
+                          <div>
+                            <span className="text-[9px] font-black uppercase tracking-wider text-zinc-500 block">
+                              {u.category || 'Categoría Libre'}
+                            </span>
+                            <h4 className="text-base font-black text-white leading-tight">{u.name || u.email}</h4>
+                            <span className="text-[10px] text-zinc-400 font-mono">Dorsal: #{u.jerseyNumber || 'S/N'}</span>
+                          </div>
+
+                          <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full ${
+                            isUpToDate 
+                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                              : totalPending > 0
+                                ? 'bg-red-500/20 text-red-300 border border-red-500/30'
+                                : 'bg-zinc-800 text-zinc-400'
                           }`}>
-                            {hasPaid ? 'Al Día' : 'Pendiente'}
+                            {isUpToDate ? 'Al Día' : totalPending > 0 ? `Debe S/ ${totalPending}` : 'Sin Cuotas'}
                           </span>
+                        </div>
+
+                        {/* Balance Meter */}
+                        <div className="grid grid-cols-2 gap-2 bg-black/60 rounded-xl p-3 mb-4 border border-zinc-800 text-xs">
+                          <div>
+                            <span className="text-[9px] text-zinc-500 font-bold block uppercase">Pagado</span>
+                            <span className="text-sm font-black text-emerald-400 font-mono">S/ {totalPaid.toFixed(2)}</span>
+                          </div>
+                          <div>
+                            <span className="text-[9px] text-zinc-500 font-bold block uppercase">Falta Pagar</span>
+                            <span className={`text-sm font-black font-mono ${totalPending > 0 ? 'text-red-400' : 'text-zinc-400'}`}>
+                              S/ {totalPending.toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Action buttons per athlete */}
+                        <div className="flex items-center justify-between gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadPlayerStatement(u)}
+                            className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-400 hover:text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 px-3 py-1.5 rounded-xl transition-colors"
+                          >
+                            <FileDown className="w-3.5 h-3.5" />
+                            <span>PDF Estado de Cuenta</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleOpenNewFeeModal(u)}
+                            className="text-xs font-bold text-zinc-300 hover:text-white bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 rounded-xl transition-colors"
+                          >
+                            + Cuota
+                          </button>
                         </div>
                       </div>
                     );
                   })}
                 </div>
+
+                {/* Table of Monthly Fee Records */}
+                <div className="bg-zinc-900/80 backdrop-blur-xl rounded-2xl border border-zinc-800 overflow-hidden shadow-xl">
+                  <div className="px-6 py-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-950">
+                    <h3 className="font-bold text-white text-sm sm:text-base">Detalle de Cuotas Emitidas</h3>
+                    <span className="text-xs text-zinc-400 font-mono">{monthlyFees.length} registros</span>
+                  </div>
+
+                  <div className="overflow-x-auto max-h-[500px]">
+                    <table className="w-full text-left">
+                      <thead className="bg-zinc-950 text-zinc-500 text-[10px] font-black uppercase tracking-widest border-b border-zinc-800 sticky top-0">
+                        <tr>
+                          <th className="px-5 py-3.5">Mes / Periodo</th>
+                          <th className="px-5 py-3.5">Deportista</th>
+                          <th className="px-5 py-3.5">Cuota</th>
+                          <th className="px-5 py-3.5">Pagado</th>
+                          <th className="px-5 py-3.5">Saldo Deuda</th>
+                          <th className="px-5 py-3.5">Estado</th>
+                          <th className="px-5 py-3.5 text-right">Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-800/60 text-xs">
+                        {monthlyFees.length === 0 ? (
+                          <tr>
+                            <td colSpan={7} className="p-8 text-center text-zinc-500">
+                              No hay cuotas mensuales registradas aún. Haz clic en "Generar Cuotas del Mes" o "Registrar Cuota".
+                            </td>
+                          </tr>
+                        ) : (
+                          (feeMonthFilter ? monthlyFees.filter(f => f.monthPeriod === feeMonthFilter) : monthlyFees).map(f => {
+                            const pending = Math.max(0, (Number(f.amount) || 0) - (Number(f.paidAmount) || 0));
+                            return (
+                              <tr key={f.id} className="hover:bg-zinc-800/30 transition-colors">
+                                <td className="px-5 py-3.5 font-mono text-zinc-300 font-bold">{f.monthName || f.monthPeriod}</td>
+                                <td className="px-5 py-3.5 font-bold text-white">{f.userName}</td>
+                                <td className="px-5 py-3.5 font-mono text-zinc-300">S/ {Number(f.amount).toFixed(2)}</td>
+                                <td className="px-5 py-3.5 font-mono text-emerald-400 font-bold">S/ {Number(f.paidAmount || 0).toFixed(2)}</td>
+                                <td className="px-5 py-3.5 font-mono font-bold text-red-400">
+                                  {pending > 0 ? `S/ ${pending.toFixed(2)}` : 'S/ 0.00'}
+                                </td>
+                                <td className="px-5 py-3.5">
+                                  <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
+                                    f.status === 'al_dia' || pending === 0 
+                                      ? 'bg-emerald-500/20 text-emerald-300'
+                                      : pending > 0 && Number(f.paidAmount) > 0
+                                        ? 'bg-amber-500/20 text-amber-300'
+                                        : 'bg-red-500/20 text-red-300'
+                                  }`}>
+                                    {f.status === 'al_dia' || pending === 0 ? 'Al Día' : pending > 0 && Number(f.paidAmount) > 0 ? 'Parcial' : 'Pendiente'}
+                                  </span>
+                                </td>
+                                <td className="px-5 py-3.5 text-right space-x-2">
+                                  <button
+                                    onClick={() => handleDeleteMonthlyFee(f.id)}
+                                    className="p-1 text-zinc-500 hover:text-red-400 transition-colors"
+                                    title="Eliminar cuota"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* MODAL FOR MONTHLY FEE CREATION */}
+                {showFeeModal && (
+                  <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-zinc-950 border border-zinc-800 rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl animate-fade-in relative">
+                      <button 
+                        onClick={() => setShowFeeModal(false)}
+                        className="absolute top-4 right-4 text-zinc-500 hover:text-white p-2"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+
+                      <div className="border-b border-zinc-800 pb-3">
+                        <h3 className="text-lg font-black text-white">Registrar Cuota Mensual</h3>
+                        <p className="text-xs text-zinc-400 mt-0.5">Control de cuota individual por deportista</p>
+                      </div>
+
+                      <form onSubmit={handleSaveMonthlyFee} className="space-y-4">
+                        <div>
+                          <label className="block text-xs font-semibold text-zinc-400 mb-1">Deportista / Integrante</label>
+                          <select 
+                            value={feeForm.userId}
+                            onChange={(e) => setFeeForm(prev => ({ ...prev, userId: e.target.value }))}
+                            className="w-full rounded-xl border border-zinc-800 bg-black text-white px-3.5 py-2.5 text-sm focus:ring-2 outline-none"
+                            style={{ ['--tw-ring-color' as any]: configPrimaryColor }}
+                            required
+                          >
+                            <option value="">Seleccionar atleta...</option>
+                            {users.map(u => (
+                              <option key={u.id} value={u.id}>{u.name || u.email}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-semibold text-zinc-400 mb-1">Periodo (Mes)</label>
+                            <input 
+                              type="month"
+                              value={feeForm.monthPeriod}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                const [y, m] = val.split('-');
+                                const d = new Date(parseInt(y), parseInt(m) - 1, 1);
+                                const name = format(d, "MMMM yyyy", { locale: es });
+                                setFeeForm(prev => ({ 
+                                  ...prev, 
+                                  monthPeriod: val,
+                                  monthName: name.charAt(0).toUpperCase() + name.slice(1)
+                                }));
+                              }}
+                              className="w-full rounded-xl border border-zinc-800 bg-black text-white px-3.5 py-2 text-xs font-mono outline-none"
+                              required
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-zinc-400 mb-1">Monto de la Cuota (S/)</label>
+                            <input 
+                              type="number"
+                              step="0.01"
+                              value={feeForm.amount}
+                              onChange={(e) => setFeeForm(prev => ({ ...prev, amount: Number(e.target.value) }))}
+                              className="w-full rounded-xl border border-zinc-800 bg-black text-white px-3.5 py-2 text-xs outline-none"
+                              required
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-semibold text-zinc-400 mb-1">Monto Pagado (S/)</label>
+                            <input 
+                              type="number"
+                              step="0.01"
+                              value={feeForm.paidAmount}
+                              onChange={(e) => setFeeForm(prev => ({ ...prev, paidAmount: Number(e.target.value) }))}
+                              className="w-full rounded-xl border border-zinc-800 bg-black text-white px-3.5 py-2 text-xs outline-none font-bold text-emerald-400"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-zinc-400 mb-1">Fecha Límite</label>
+                            <input 
+                              type="date"
+                              value={feeForm.dueDate || ''}
+                              onChange={(e) => setFeeForm(prev => ({ ...prev, dueDate: e.target.value }))}
+                              className="w-full rounded-xl border border-zinc-800 bg-black text-white px-3.5 py-2 text-xs outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex justify-end gap-3 pt-2">
+                          <button
+                            type="button"
+                            onClick={() => setShowFeeModal(false)}
+                            className="px-4 py-2 text-xs text-zinc-400 hover:text-white"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            type="submit"
+                            className="px-5 py-2 rounded-xl text-xs font-bold text-white shadow-lg"
+                            style={{ backgroundColor: configPrimaryColor }}
+                          >
+                            Guardar Cuota
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                )}
+
               </div>
             )}
 
+            {/* TAB 4: UNIFORMES (PEDIDOS Y CONFECCIÓN) */}
             {treasuryView === 'uniformes' && (
-              <div className="bg-zinc-900/70 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6 shadow-xl space-y-6">
-                <div className="border-b border-zinc-800 pb-4">
-                  <h3 className="text-base sm:text-lg font-bold text-white">Control de Uniformes e Indumentaria</h3>
-                  <p className="text-xs text-zinc-400">Verifica qué integrantes ya han cancelado su indumentaria deportiva.</p>
+              <div className="space-y-6">
+                
+                {/* Control Bar */}
+                <div className="bg-zinc-900/80 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6 shadow-xl space-y-4">
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-zinc-800 pb-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Shirt className="w-5 h-5 text-amber-400" />
+                        <h3 className="text-base sm:text-lg font-black text-white">Control de Uniformes e Indumentaria</h3>
+                      </div>
+                      <p className="text-xs text-zinc-400 mt-1">
+                        Configura uniformes completos o camisetas, tallas, dorsales y alias en espalda. Genera la hoja técnica en PDF por lote para enviar a confección.
+                      </p>
+                    </div>
+
+                    {/* Top Action Buttons */}
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadUniformBatchPDF(selectedUniformBatch)}
+                        className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-black text-xs font-black px-4 py-2.5 rounded-xl shadow-lg transition-transform hover:scale-105"
+                      >
+                        <FileDown className="w-4 h-4" />
+                        <span>Descargar PDF para Confección</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleOpenNewUniformModal()}
+                        className="inline-flex items-center gap-2 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg transition-transform hover:scale-105"
+                        style={{ backgroundColor: configPrimaryColor }}
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Nuevo Pedido de Uniforme</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Batch Selector Filter */}
+                  <div className="flex items-center gap-3 text-xs">
+                    <span className="text-zinc-400 font-semibold">Seleccionar Lote de Pedido:</span>
+                    <select 
+                      value={selectedUniformBatch}
+                      onChange={(e) => setSelectedUniformBatch(e.target.value)}
+                      className="bg-black border border-zinc-800 rounded-xl px-3 py-1.5 text-white outline-none focus:ring-2"
+                      style={{ ['--tw-ring-color' as any]: configPrimaryColor }}
+                    >
+                      <option value="Todos los Lotes">Todos los Lotes</option>
+                      {Array.from(new Set(uniformOrders.map(o => o.batchName))).filter(Boolean).map(b => (
+                        <option key={b} value={b}>{b}</option>
+                      ))}
+                      <option value="Lote Apertura 2026">Lote Apertura 2026</option>
+                      <option value="Lote Clausura 2026">Lote Clausura 2026</option>
+                    </select>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {users.map(u => {
-                    const uniformPayment = payments.find(p => p.userId === u.id && p.concept.includes('Uniforme'));
-                    return (
-                      <div 
-                        key={u.id}
-                        className={`p-4 rounded-xl border flex items-center justify-between gap-3 ${
-                          uniformPayment ? 'bg-blue-500/10 border-blue-500/30' : 'bg-zinc-950 border-zinc-800'
-                        }`}
-                      >
-                        <div>
-                          <h4 className="font-bold text-sm text-white">{u.name || u.email}</h4>
-                          <span className="text-[10px] text-zinc-400 block font-mono">Dorsal #{u.jerseyNumber || 'S/N'}</span>
-                        </div>
-                        <div className="text-right">
-                          <span className={`text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${
-                            uniformPayment ? 'bg-blue-500/20 text-blue-300' : 'bg-zinc-800 text-zinc-400'
-                          }`}>
-                            {uniformPayment ? `Pagado (S/ ${uniformPayment.amount})` : 'Sin Pago'}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
+                {/* Orders Table */}
+                <div className="bg-zinc-900/80 backdrop-blur-xl rounded-2xl border border-zinc-800 overflow-hidden shadow-xl">
+                  <div className="px-6 py-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-950">
+                    <h3 className="font-bold text-white text-sm sm:text-base">Lista de Pedidos ({selectedUniformBatch})</h3>
+                    <span className="text-xs text-zinc-400 font-mono">
+                      {selectedUniformBatch === 'Todos los Lotes' ? uniformOrders.length : uniformOrders.filter(o => o.batchName === selectedUniformBatch).length} prendas
+                    </span>
+                  </div>
+
+                  <div className="overflow-x-auto max-h-[500px]">
+                    <table className="w-full text-left">
+                      <thead className="bg-zinc-950 text-zinc-500 text-[10px] font-black uppercase tracking-widest border-b border-zinc-800 sticky top-0">
+                        <tr>
+                          <th className="px-5 py-3.5">Deportista</th>
+                          <th className="px-5 py-3.5">Tipo Prenda</th>
+                          <th className="px-5 py-3.5">Talla</th>
+                          <th className="px-5 py-3.5">Dorsal</th>
+                          <th className="px-5 py-3.5">Alias / Espalda</th>
+                          <th className="px-5 py-3.5">Lote</th>
+                          <th className="px-5 py-3.5">Estado Pago</th>
+                          <th className="px-5 py-3.5 text-right">Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-800/60 text-xs">
+                        {(selectedUniformBatch === 'Todos los Lotes' ? uniformOrders : uniformOrders.filter(o => o.batchName === selectedUniformBatch)).length === 0 ? (
+                          <tr>
+                            <td colSpan={8} className="p-8 text-center text-zinc-500">
+                              No hay pedidos de uniforme en este lote. Haz clic en "Nuevo Pedido de Uniforme" para registrar.
+                            </td>
+                          </tr>
+                        ) : (
+                          (selectedUniformBatch === 'Todos los Lotes' ? uniformOrders : uniformOrders.filter(o => o.batchName === selectedUniformBatch)).map(o => (
+                            <tr key={o.id} className="hover:bg-zinc-800/30 transition-colors">
+                              <td className="px-5 py-3.5 font-bold text-white">
+                                {o.userName}
+                                <span className="text-[10px] text-zinc-500 block font-normal">{o.userCategory || 'General'}</span>
+                              </td>
+                              <td className="px-5 py-3.5">
+                                <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full ${
+                                  o.itemType === 'completo' 
+                                    ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' 
+                                    : 'bg-zinc-800 text-zinc-300 border border-zinc-700'
+                                }`}>
+                                  {o.itemType === 'completo' ? 'Completo (Camiseta + Short)' : 'Sólo Camiseta'}
+                                </span>
+                              </td>
+                              <td className="px-5 py-3.5 font-bold font-mono text-amber-400">{o.size}</td>
+                              <td className="px-5 py-3.5 font-bold font-mono text-white text-sm">#{o.number || 'S/N'}</td>
+                              <td className="px-5 py-3.5 font-mono text-zinc-200 font-bold uppercase tracking-wider">{o.nameOnBack || '-'}</td>
+                              <td className="px-5 py-3.5 text-zinc-400 font-mono text-[11px]">{o.batchName}</td>
+                              <td className="px-5 py-3.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleUniformPaid(o)}
+                                  className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full transition-transform hover:scale-105 ${
+                                    o.isPaid 
+                                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' 
+                                      : 'bg-red-500/20 text-red-300 border border-red-500/30'
+                                  }`}
+                                >
+                                  {o.isPaid ? 'Pagado' : 'Pendiente'}
+                                </button>
+                              </td>
+                              <td className="px-5 py-3.5 text-right space-x-2">
+                                <button
+                                  onClick={() => handleEditUniformOrder(o)}
+                                  className="p-1 text-zinc-400 hover:text-white transition-colors"
+                                  title="Editar pedido"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteUniformOrder(o.id)}
+                                  className="p-1 text-zinc-500 hover:text-red-400 transition-colors"
+                                  title="Eliminar pedido"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
+
+                {/* MODAL FOR UNIFORM ORDER CREATION & EDITING */}
+                {showUniformModal && (
+                  <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-zinc-950 border border-zinc-800 rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-5 shadow-2xl animate-fade-in relative max-h-[90vh] overflow-y-auto">
+                      <button 
+                        onClick={() => setShowUniformModal(false)}
+                        className="absolute top-4 right-4 text-zinc-500 hover:text-white p-2"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+
+                      <div className="border-b border-zinc-800 pb-3">
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30 mb-2">
+                          <Shirt className="w-3.5 h-3.5" /> Confección de Indumentaria
+                        </div>
+                        <h3 className="text-lg font-black text-white">
+                          {editingUniformOrder ? 'Editar Pedido de Uniforme' : 'Nuevo Pedido de Uniforme'}
+                        </h3>
+                        <p className="text-xs text-zinc-400 mt-0.5">
+                          Personaliza tipo de prenda, dorsal, nombre en espalda y lote de envío al taller.
+                        </p>
+                      </div>
+
+                      <form onSubmit={handleSaveUniformOrder} className="space-y-4">
+                        <div>
+                          <label className="block text-xs font-semibold text-zinc-400 mb-1">Deportista / Titular</label>
+                          <select 
+                            value={uniformForm.userId}
+                            onChange={(e) => {
+                              const uId = e.target.value;
+                              const selectedU = users.find(u => u.id === uId);
+                              setUniformForm(prev => ({ 
+                                ...prev, 
+                                userId: uId,
+                                userName: selectedU?.name || selectedU?.email || '',
+                                number: selectedU?.jerseyNumber || prev.number || '',
+                                nameOnBack: selectedU?.name ? selectedU.name.split(' ')[0].toUpperCase() : prev.nameOnBack
+                              }));
+                            }}
+                            className="w-full rounded-xl border border-zinc-800 bg-black text-white px-3.5 py-2.5 text-sm focus:ring-2 outline-none"
+                            style={{ ['--tw-ring-color' as any]: configPrimaryColor }}
+                            required
+                          >
+                            <option value="">Seleccionar atleta...</option>
+                            {users.map(u => (
+                              <option key={u.id} value={u.id}>{u.name || u.email}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-semibold text-zinc-400 mb-1">Tipo de Uniforme</label>
+                            <select 
+                              value={uniformForm.itemType}
+                              onChange={(e) => setUniformForm(prev => ({ ...prev, itemType: e.target.value as any }))}
+                              className="w-full rounded-xl border border-zinc-800 bg-black text-white px-3.5 py-2.5 text-xs outline-none"
+                            >
+                              <option value="completo">Completo (Camiseta + Short)</option>
+                              <option value="solo_camiseta">Sólo Camiseta Oficial</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-zinc-400 mb-1">Talla</label>
+                            <select 
+                              value={uniformForm.size}
+                              onChange={(e) => setUniformForm(prev => ({ ...prev, size: e.target.value }))}
+                              className="w-full rounded-xl border border-zinc-800 bg-black text-white px-3.5 py-2.5 text-xs outline-none font-bold"
+                            >
+                              <option value="12">Talla 12 (Niño)</option>
+                              <option value="14">Talla 14 (Juvenil)</option>
+                              <option value="16">Talla 16 (Juvenil)</option>
+                              <option value="XS">XS</option>
+                              <option value="S">S (Small)</option>
+                              <option value="M">M (Medium)</option>
+                              <option value="L">L (Large)</option>
+                              <option value="XL">XL (Extra Large)</option>
+                              <option value="XXL">XXL</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-semibold text-zinc-400 mb-1">Número / Dorsal</label>
+                            <input 
+                              type="text" 
+                              value={uniformForm.number || ''}
+                              onChange={(e) => setUniformForm(prev => ({ ...prev, number: e.target.value }))}
+                              placeholder="Ej. 10"
+                              className="w-full rounded-xl border border-zinc-800 bg-black text-white px-3.5 py-2.5 text-xs outline-none font-bold text-amber-400"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-zinc-400 mb-1">Alias en Espalda (Estampado)</label>
+                            <input 
+                              type="text" 
+                              value={uniformForm.nameOnBack || ''}
+                              onChange={(e) => setUniformForm(prev => ({ ...prev, nameOnBack: e.target.value.toUpperCase() }))}
+                              placeholder="Ej. MENDOZA"
+                              className="w-full rounded-xl border border-zinc-800 bg-black text-white px-3.5 py-2.5 text-xs outline-none uppercase font-mono"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-semibold text-zinc-400 mb-1">Lote de Pedido</label>
+                            <input 
+                              type="text" 
+                              value={uniformForm.batchName || ''}
+                              onChange={(e) => setUniformForm(prev => ({ ...prev, batchName: e.target.value }))}
+                              placeholder="Ej. Lote Apertura 2026"
+                              className="w-full rounded-xl border border-zinc-800 bg-black text-white px-3.5 py-2.5 text-xs outline-none"
+                              required
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-zinc-400 mb-1">Precio (S/)</label>
+                            <input 
+                              type="number" 
+                              value={uniformForm.price}
+                              onChange={(e) => setUniformForm(prev => ({ ...prev, price: Number(e.target.value) }))}
+                              className="w-full rounded-xl border border-zinc-800 bg-black text-white px-3.5 py-2.5 text-xs outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="p-3 bg-zinc-900 rounded-xl border border-zinc-800">
+                          <label className="flex items-center gap-2.5 cursor-pointer">
+                            <input 
+                              type="checkbox" 
+                              checked={uniformForm.isPaid}
+                              onChange={(e) => setUniformForm(prev => ({ ...prev, isPaid: e.target.checked }))}
+                              className="w-4 h-4 rounded text-blue-600 focus:ring-0 bg-black border-zinc-700"
+                            />
+                            <span className="text-xs font-bold text-white">¿Uniforme Cancelado / Pagado?</span>
+                          </label>
+                        </div>
+
+                        <div className="flex justify-end gap-3 pt-2">
+                          <button
+                            type="button"
+                            onClick={() => setShowUniformModal(false)}
+                            className="px-4 py-2 text-xs text-zinc-400 hover:text-white"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            type="submit"
+                            className="px-5 py-2.5 rounded-xl text-xs font-bold text-white shadow-lg"
+                            style={{ backgroundColor: configPrimaryColor }}
+                          >
+                            {editingUniformOrder ? 'Actualizar Pedido' : 'Guardar Pedido'}
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                )}
+
               </div>
             )}
 

@@ -8,6 +8,7 @@ import {
   setDoc, 
   addDoc, 
   updateDoc,
+  deleteDoc,
   increment,
   serverTimestamp 
 } from 'firebase/firestore';
@@ -45,7 +46,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Send,
-  HelpCircle
+  HelpCircle,
+  Edit3,
+  Trash2,
+  Shield,
+  Layers
 } from 'lucide-react';
 import { MediaItem } from '../types';
 import { compressImageFile } from '../utils/imageCompressor';
@@ -190,8 +195,20 @@ export function Home() {
     return () => unsubscribe();
   }, []);
 
-  // Action / Training photos list (Combined custom uploaded trainings + defaults)
+  // Action / Training photos list (Combined custom uploaded trainings + defaults minus hidden)
+  const [editingPost, setEditingPost] = useState<{
+    id: string;
+    title: string;
+    description: string;
+    category: string;
+    url: string;
+    isDefault?: boolean;
+  } | null>(null);
+  const [isSavingPostEdit, setIsSavingPostEdit] = useState(false);
+
   const rotatingPhotos = useMemo(() => {
+    const hiddenSet = new Set(settings.hiddenDefaultPublications || []);
+    
     const uploaded = mediaList
       .filter(item => item.url && !item.url.includes('youtube.com') && !item.url.includes('youtu.be'))
       .map(item => ({
@@ -201,14 +218,17 @@ export function Home() {
         category: item.type === 'training' ? 'Entrenamiento' : 'Club',
         url: item.url,
         tag: item.type === 'training' ? 'Entrenamiento' : 'Publicación',
-        description: item.description || 'Contenido oficial publicado por el cuerpo técnico y administración del club.'
+        description: item.description || 'Contenido oficial publicado por el cuerpo técnico y administración del club.',
+        isDefault: false
       }));
 
+    const validDefaults = DEFAULT_ACTION_PHOTOS.filter(p => !hiddenSet.has(p.id));
+
     if (uploaded.length > 0) {
-      return [...uploaded, ...DEFAULT_ACTION_PHOTOS];
+      return [...uploaded, ...validDefaults];
     }
-    return DEFAULT_ACTION_PHOTOS;
-  }, [mediaList]);
+    return validDefaults.length > 0 ? validDefaults : DEFAULT_ACTION_PHOTOS;
+  }, [mediaList, settings.hiddenDefaultPublications]);
 
   // Automatic random rotation every 4.5 seconds
   useEffect(() => {
@@ -336,6 +356,84 @@ export function Home() {
     }
   };
 
+  // Admin Delete Publication (Works for both custom and default items)
+  const handleDeletePublication = async (photo: { id: string; title: string; isDefault?: boolean }) => {
+    if (role !== 'admin') {
+      alert('Solo el Administrador tiene permisos para eliminar publicaciones.');
+      return;
+    }
+
+    const confirmDelete = window.confirm(`¿Estás seguro de eliminar la publicación "${photo.title}"?`);
+    if (!confirmDelete) return;
+
+    try {
+      if (photo.isDefault || photo.id.startsWith('def-')) {
+        // Hide default publication
+        const currentHidden = settings.hiddenDefaultPublications || [];
+        if (!currentHidden.includes(photo.id)) {
+          await setDoc(doc(db, 'settings', 'general'), {
+            hiddenDefaultPublications: [...currentHidden, photo.id],
+            updatedAt: serverTimestamp()
+          }, { merge: true });
+        }
+      } else {
+        // Delete Firestore document
+        await deleteDoc(doc(db, 'media', photo.id));
+      }
+      setQuickUploadSuccess('Publicación eliminada correctamente.');
+      setTimeout(() => setQuickUploadSuccess(null), 3500);
+    } catch (err: any) {
+      alert(err.message || 'Error al eliminar la publicación.');
+    }
+  };
+
+  // Admin Save Edited Publication
+  const handleSavePublicationEdit = async () => {
+    if (!editingPost || role !== 'admin') return;
+
+    try {
+      setIsSavingPostEdit(true);
+
+      if (editingPost.isDefault || editingPost.id.startsWith('def-')) {
+        // If editing a default post, create a new media item with edited data and hide the default
+        await addDoc(collection(db, 'media'), {
+          title: editingPost.title,
+          description: editingPost.description,
+          type: editingPost.category === 'Entrenamiento' ? 'training' : 'general',
+          url: editingPost.url,
+          likesCount: 0,
+          createdBy: user?.email || 'admin',
+          createdAt: serverTimestamp()
+        });
+
+        const currentHidden = settings.hiddenDefaultPublications || [];
+        if (!currentHidden.includes(editingPost.id)) {
+          await setDoc(doc(db, 'settings', 'general'), {
+            hiddenDefaultPublications: [...currentHidden, editingPost.id],
+            updatedAt: serverTimestamp()
+          }, { merge: true });
+        }
+      } else {
+        // Update existing media document
+        await updateDoc(doc(db, 'media', editingPost.id), {
+          title: editingPost.title,
+          description: editingPost.description,
+          type: editingPost.category === 'Entrenamiento' ? 'training' : 'general',
+          url: editingPost.url,
+          updatedAt: serverTimestamp()
+        });
+      }
+
+      setQuickUploadSuccess('¡Publicación actualizada correctamente!');
+      setEditingPost(null);
+      setTimeout(() => setQuickUploadSuccess(null), 3500);
+    } catch (err: any) {
+      alert(err.message || 'Error al guardar los cambios de la publicación.');
+    } finally {
+      setIsSavingPostEdit(false);
+    }
+  };
+
   const handleActivateTrial = () => {
     startTrial();
     window.location.hash = '#dashboard';
@@ -361,341 +459,394 @@ export function Home() {
         )}
 
         {/* =========================================================================
-            SECTION 1: TOP MAIN HERO (MATCHING MOCKUP IMG_5139.jpeg)
-            - Large cinematic photo full width
-            - Centered bold serif/display title: "THE GAME IS WON IN THE TRENCHES"
-            - Contrast Action Button: "GET STARTED FOR FREE" / "ACCESO A MIEMBROS"
-            - Admin-only change photo button
+            SECTION 1: TOP MAIN HERO (FULL PORTADA IMAGE + TEXT UNDERNEATH)
+            - Enlarged club logo highlighted at top
+            - Complete portada image (not background crop)
+            - Words and action buttons placed underneath the image
+            - Admin-only change portada photo control
            ========================================================================= */}
-        <section className="relative w-full min-h-[520px] sm:min-h-[620px] md:min-h-[700px] flex items-center justify-center overflow-hidden bg-black border-b border-zinc-800">
-          
-          {/* Main Background Image */}
-          <div className="absolute inset-0">
-            <img 
-              src={mainHeroPhoto} 
-              alt={settings.heroTitle || "Portada Oficial"} 
-              className="w-full h-full object-cover object-center brightness-95"
-            />
-            {/* Cinematic Gradient Overlays */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-black/60" />
-            <div className="absolute inset-0 bg-radial-gradient from-transparent via-black/30 to-black/80" />
-          </div>
-
-          {/* Top Admin Controls (Visible ONLY to Admin) */}
-          {role === 'admin' && (
-            <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
-              <button
-                onClick={() => mainHeroInputRef.current?.click()}
-                disabled={isUploadingMainHero}
-                className="inline-flex items-center gap-2 bg-black/85 hover:bg-black text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider border border-amber-500/50 shadow-2xl backdrop-blur-md transition-all hover:scale-105 cursor-pointer"
-                title="Solo Administrador: Cambiar imagen de portada principal"
-              >
-                {isUploadingMainHero ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
-                    <span>Guardando Portada...</span>
-                  </>
-                ) : (
-                  <>
-                    <Camera className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Admin: Cambiar Portada Principal</span>
-                  </>
-                )}
-              </button>
-
-              <input 
-                type="file" 
-                ref={mainHeroInputRef}
-                accept="image/*"
-                onChange={handleQuickMainHeroUpload}
-                className="hidden"
-              />
-            </div>
-          )}
-
-          {/* Centered Hero Content (Mockup Design) */}
-          <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 text-center space-y-6 sm:space-y-8 py-16 sm:py-24">
+        <section className="relative w-full bg-black border-b border-zinc-800 py-8 sm:py-12">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
             
-            {/* Club Brand Tag */}
-            <div className="flex items-center justify-center gap-2.5">
+            {/* Top Club Identity - Highlighted & Enlarged Logo */}
+            <div className="flex flex-col items-center justify-center text-center space-y-3">
               {settings.logoUrl ? (
-                <img src={settings.logoUrl} alt="Logo" className="w-10 h-10 object-contain drop-shadow-xl" />
+                <div className="relative p-1.5 rounded-3xl bg-zinc-900 border-2 border-lime-400/40 shadow-[0_0_25px_rgba(204,255,0,0.2)]">
+                  <img 
+                    src={settings.logoUrl} 
+                    alt="Logo Oficial" 
+                    className="w-20 h-20 sm:w-28 sm:h-28 object-contain rounded-2xl drop-shadow-2xl" 
+                  />
+                </div>
               ) : (
                 <div 
-                  className="w-8 h-8 rounded-lg flex items-center justify-center font-black text-black text-sm"
+                  className="w-20 h-20 sm:w-28 sm:h-28 rounded-3xl flex items-center justify-center font-black text-black text-3xl sm:text-4xl shadow-[0_0_25px_rgba(204,255,0,0.3)] border-2 border-white/20"
                   style={{ backgroundColor: '#ccff00' }}
                 >
                   {settings.appName ? settings.appName.charAt(0) : 'C'}
                 </div>
               )}
-              <span className="text-xs sm:text-sm font-black uppercase tracking-[0.25em] text-white/90 drop-shadow-md">
-                {settings.appName || 'CLUB DEPORTIVO'}
-              </span>
+
+              <div className="space-y-1">
+                <span className="text-xs sm:text-sm font-black uppercase tracking-[0.3em] text-lime-400">
+                  {settings.appName || 'CLUB DEPORTIVO'}
+                </span>
+                {settings.slogan && (
+                  <p className="text-xs text-zinc-400 font-medium tracking-wide">
+                    {settings.slogan}
+                  </p>
+                )}
+              </div>
             </div>
 
-            {/* Display Headline - Exactly in the style of "THE GAME IS WON IN THE TRENCHES" */}
-            <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-serif sm:font-black font-extrabold text-white uppercase tracking-wider leading-tight sm:leading-none drop-shadow-[0_4px_20px_rgba(0,0,0,0.9)] max-w-3xl mx-auto">
-              {settings.heroTitle ? (
-                settings.heroTitle
-              ) : (
-                <>THE GAME IS WON IN THE TRENCHES</>
-              )}
-            </h1>
+            {/* Complete Portada Image Container (Not cropped background) */}
+            <div className="relative bg-zinc-950 rounded-3xl border border-zinc-800 p-2 sm:p-4 shadow-2xl overflow-hidden group">
+              <div className="relative w-full flex items-center justify-center bg-black/90 rounded-2xl overflow-hidden min-h-[280px] sm:min-h-[420px] max-h-[560px]">
+                <img 
+                  src={mainHeroPhoto} 
+                  alt={settings.heroTitle || "Portada Oficial del Club"} 
+                  className="w-full h-auto max-h-[560px] object-contain mx-auto rounded-xl shadow-inner transition-transform duration-500 group-hover:scale-[1.01]"
+                />
+              </div>
 
-            {/* Subtitle / Philosophy */}
-            <p className="text-xs sm:text-base text-zinc-300 font-medium max-w-xl mx-auto leading-relaxed drop-shadow-md">
-              {settings.heroSubtitle || settings.slogan || 'Disciplina, intensidad y pasión en cada sesión de entrenamiento.'}
-            </p>
-
-            {/* High-Contrast Action Button (Lime Yellow / Accent matching mockup) */}
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
-              {!user ? (
-                <>
+              {/* Admin-only Button to Change Portada */}
+              {role === 'admin' && (
+                <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-20">
                   <button
-                    onClick={() => setShowLogin(true)}
-                    className="w-full sm:w-auto px-8 sm:px-10 py-3.5 sm:py-4 rounded-none sm:rounded-sm font-black text-xs sm:text-sm uppercase tracking-[0.2em] text-black shadow-2xl transition-transform hover:scale-105 active:scale-95 cursor-pointer min-h-[48px] flex items-center justify-center gap-2"
-                    style={{
-                      backgroundColor: '#ccff00', // Lime yellow from mockup
-                      boxShadow: '0 10px 30px rgba(204, 255, 0, 0.4)'
-                    }}
+                    onClick={() => mainHeroInputRef.current?.click()}
+                    disabled={isUploadingMainHero}
+                    className="inline-flex items-center gap-2 bg-black/90 hover:bg-black text-amber-300 hover:text-white px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider border border-amber-500/60 shadow-2xl backdrop-blur-md transition-all hover:scale-105 cursor-pointer"
+                    title="Solo Administrador: Cambiar imagen de portada principal"
                   >
-                    <span>{settings.ctaButtonText || 'GET STARTED FOR FREE'}</span>
+                    {isUploadingMainHero ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin text-amber-400" />
+                        <span>Guardando Portada...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Camera className="w-4 h-4 text-amber-400" />
+                        <span>Admin: Cambiar Portada</span>
+                      </>
+                    )}
                   </button>
 
-                  <button
-                    onClick={handleActivateTrial}
-                    className="w-full sm:w-auto px-6 py-3.5 rounded-none sm:rounded-sm font-bold text-xs uppercase tracking-wider text-white bg-black/80 hover:bg-black border border-white/30 backdrop-blur-md transition-all hover:scale-105 cursor-pointer min-h-[48px] flex items-center justify-center gap-2"
-                  >
-                    <Sparkles className="w-4 h-4 text-amber-400" />
-                    <span>{isTrialActive ? `Pase Activo (Día ${currentDay}/7)` : 'Pase Gratis 7 Días'}</span>
-                  </button>
-                </>
-              ) : (
-                <>
-                  <a
-                    href="#dashboard"
-                    className="w-full sm:w-auto px-8 sm:px-10 py-3.5 sm:py-4 font-black text-xs sm:text-sm uppercase tracking-[0.2em] text-black shadow-2xl transition-transform hover:scale-105 cursor-pointer min-h-[48px] flex items-center justify-center gap-2 rounded-sm"
-                    style={{
-                      backgroundColor: '#ccff00',
-                      boxShadow: '0 10px 30px rgba(204, 255, 0, 0.4)'
-                    }}
-                  >
-                    <span>ENTRENAMIENTOS Y VIDEOS</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </a>
-
-                  <a
-                    href="#profile"
-                    className="w-full sm:w-auto px-6 py-3.5 font-bold text-xs uppercase tracking-wider text-white bg-black/80 hover:bg-black border border-white/30 backdrop-blur-md transition-all hover:scale-105 cursor-pointer min-h-[48px] flex items-center justify-center gap-2 rounded-sm"
-                  >
-                    {role === 'admin' ? 'PANEL DE ADMINISTRACIÓN' : 'MI PERFIL DE JUGADOR'}
-                  </a>
-                </>
+                  <input 
+                    type="file" 
+                    ref={mainHeroInputRef}
+                    accept="image/*"
+                    onChange={handleQuickMainHeroUpload}
+                    className="hidden"
+                  />
+                </div>
               )}
+            </div>
+
+            {/* Words, Headline and Action Buttons (UNDERNEATH the Portada Image) */}
+            <div className="text-center space-y-6 max-w-4xl mx-auto pt-2">
+              
+              {/* Display Headline */}
+              <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-white uppercase tracking-tight leading-tight drop-shadow-xl">
+                {settings.heroTitle ? (
+                  settings.heroTitle
+                ) : (
+                  <>THE GAME IS WON IN THE TRENCHES</>
+                )}
+              </h1>
+
+              {/* Subtitle / Philosophy */}
+              <p className="text-sm sm:text-base md:text-lg text-zinc-300 font-medium max-w-2xl mx-auto leading-relaxed">
+                {settings.heroSubtitle || settings.slogan || 'Disciplina, intensidad y pasión en cada sesión de entrenamiento.'}
+              </p>
+
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
+                {!user ? (
+                  <>
+                    <button
+                      onClick={() => setShowLogin(true)}
+                      className="w-full sm:w-auto px-8 sm:px-10 py-3.5 sm:py-4 rounded-xl font-black text-xs sm:text-sm uppercase tracking-[0.2em] text-black shadow-2xl transition-transform hover:scale-105 active:scale-95 cursor-pointer min-h-[48px] flex items-center justify-center gap-2"
+                      style={{
+                        backgroundColor: '#ccff00',
+                        boxShadow: '0 10px 30px rgba(204, 255, 0, 0.4)'
+                      }}
+                    >
+                      <span>{settings.ctaButtonText || 'GET STARTED FOR FREE'}</span>
+                    </button>
+
+                    <button
+                      onClick={handleActivateTrial}
+                      className="w-full sm:w-auto px-6 py-3.5 rounded-xl font-bold text-xs uppercase tracking-wider text-white bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 shadow-xl transition-all hover:scale-105 cursor-pointer min-h-[48px] flex items-center justify-center gap-2"
+                    >
+                      <Sparkles className="w-4 h-4 text-amber-400" />
+                      <span>{isTrialActive ? `Pase Activo (Día ${currentDay}/7)` : 'Pase Gratis 7 Días'}</span>
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <a
+                      href="#dashboard"
+                      className="w-full sm:w-auto px-8 sm:px-10 py-3.5 sm:py-4 font-black text-xs sm:text-sm uppercase tracking-[0.2em] text-black shadow-2xl transition-transform hover:scale-105 cursor-pointer min-h-[48px] flex items-center justify-center gap-2 rounded-xl"
+                      style={{
+                        backgroundColor: '#ccff00',
+                        boxShadow: '0 10px 30px rgba(204, 255, 0, 0.4)'
+                      }}
+                    >
+                      <span>ENTRENAMIENTOS Y VIDEOS</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </a>
+
+                    <a
+                      href="#profile"
+                      className="w-full sm:w-auto px-6 py-3.5 font-bold text-xs uppercase tracking-wider text-white bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 shadow-xl transition-all hover:scale-105 cursor-pointer min-h-[48px] flex items-center justify-center gap-2 rounded-xl"
+                    >
+                      {role === 'admin' ? 'PANEL DE ADMINISTRACIÓN' : 'MI PERFIL DE JUGADOR'}
+                    </a>
+                  </>
+                )}
+              </div>
+
             </div>
 
           </div>
-
         </section>
 
 
         {/* =========================================================================
-            SECTION 2: LOWER ROTATING TRAINING & ACTION BLOCK (MATCHING MOCKUP)
-            - Directly underneath the top hero
-            - High impact action photo changing automatically & randomly
-            - Full commenting capability on each publication
-            - Admin-only training photo upload button
+            SECTION 2: ROTATING TRAINING PHOTOS (COMPLETE IMAGE + TEXT UNDERNEATH)
+            - Complete photo shown in its frame
+            - Words, titles, descriptions and actions placed UNDER the photo
+            - Admin-only controls to upload, edit, and delete any publication
            ========================================================================= */}
-        <section className="relative w-full min-h-[480px] sm:min-h-[580px] md:min-h-[660px] flex items-center justify-center overflow-hidden bg-black border-b border-zinc-800">
-          
-          {/* Action Background Image with Cross-fade transition */}
-          <div className="absolute inset-0">
-            <img 
-              key={activeSlidePhoto.id + '-' + activeSlidePhoto.url}
-              src={activeSlidePhoto.url} 
-              alt={activeSlidePhoto.title} 
-              className="w-full h-full object-cover object-center brightness-90 animate-fade-in transition-all duration-700"
-            />
-            {/* Dramatic Lighting Gradients */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/45 to-black/60" />
-            <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-transparent to-black/80" />
-          </div>
-
-          {/* Admin-only Upload Control on Training Block */}
-          {role === 'admin' && (
-            <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
-              <button
-                onClick={() => trainingInputRef.current?.click()}
-                disabled={isUploadingTrainingPhoto}
-                className="inline-flex items-center gap-2 bg-black/90 hover:bg-black text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider border border-emerald-500/50 shadow-2xl backdrop-blur-md transition-all hover:scale-105 cursor-pointer"
-                title="Solo Administrador: Subir fotos de entrenamiento directamente"
-              >
-                {isUploadingTrainingPhoto ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
-                    <span>Subiendo Foto(s)...</span>
-                  </>
-                ) : (
-                  <>
-                    <Plus className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Admin: + Subir Foto de Entrenamiento</span>
-                  </>
-                )}
-              </button>
-
-              <input 
-                type="file" 
-                ref={trainingInputRef}
-                accept="image/*"
-                multiple
-                onChange={handleQuickTrainingUpload}
-                className="hidden"
-              />
-            </div>
-          )}
-
-          {/* Slide Navigation Arrows */}
-          <div className="absolute inset-y-0 left-2 sm:left-4 z-20 flex items-center">
-            <button
-              onClick={handlePrevSlide}
-              className="p-2.5 sm:p-3 rounded-full bg-black/60 hover:bg-black text-white border border-white/20 hover:border-white/50 backdrop-blur-md transition-transform hover:scale-110 cursor-pointer shadow-xl"
-              title="Foto anterior"
-            >
-              <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
-            </button>
-          </div>
-
-          <div className="absolute inset-y-0 right-2 sm:right-4 z-20 flex items-center">
-            <button
-              onClick={handleNextSlide}
-              className="p-2.5 sm:p-3 rounded-full bg-black/60 hover:bg-black text-white border border-white/20 hover:border-white/50 backdrop-blur-md transition-transform hover:scale-110 cursor-pointer shadow-xl"
-              title="Siguiente foto"
-            >
-              <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
-            </button>
-          </div>
-
-          {/* Lower Hero Action Content & Controls */}
-          <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 text-center space-y-5 sm:space-y-6 py-14 sm:py-20">
+        <section className="relative w-full bg-zinc-950 border-b border-zinc-800 py-10 sm:py-16">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
             
-            {/* Category & Random Switch Indicator */}
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              <span 
-                className="px-3.5 py-1 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-widest text-black shadow-lg"
-                style={{ backgroundColor: '#ccff00' }}
-              >
-                {activeSlidePhoto.category || 'ENTRENAMIENTO OFICIAL'}
-              </span>
+            {/* Section Header */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-zinc-800/80 pb-4">
+              <div className="text-center sm:text-left">
+                <div className="flex items-center justify-center sm:justify-start gap-2 text-xs font-black uppercase tracking-[0.2em] text-lime-400">
+                  <Activity className="w-4 h-4" />
+                  <span>Sesiones en Cancha y Preparación</span>
+                </div>
+                <h2 className="text-xl sm:text-2xl font-black text-white mt-1">
+                  Fotos de Entrenamientos del Club
+                </h2>
+              </div>
 
-              <button
-                onClick={handleRandomSlide}
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wider bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700 backdrop-blur-md transition-colors cursor-pointer"
-                title="Cambiar foto aleatoriamente"
-              >
-                <Shuffle className="w-3 h-3 text-amber-400" />
-                <span>Foto Aleatoria</span>
-              </button>
+              {/* Admin-only Upload & Edit Controls */}
+              {role === 'admin' && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    onClick={() => trainingInputRef.current?.click()}
+                    disabled={isUploadingTrainingPhoto}
+                    className="inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-black px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider shadow-lg transition-all hover:scale-105 cursor-pointer"
+                    title="Solo Administrador: Subir fotos de entrenamiento"
+                  >
+                    {isUploadingTrainingPhoto ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Subiendo...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>+ Subir Foto</span>
+                      </>
+                    )}
+                  </button>
 
-              <button
-                onClick={() => setIsAutoRotating(!isAutoRotating)}
-                className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border transition-colors cursor-pointer ${
-                  isAutoRotating 
-                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' 
-                    : 'bg-zinc-800 text-zinc-400 border-zinc-700'
-                }`}
-                title="Pausar o activar rotación automática"
-              >
-                {isAutoRotating ? '● Rotación Activa' : '○ Pausado'}
-              </button>
-            </div>
+                  <button
+                    onClick={() => setEditingPost({
+                      id: activeSlidePhoto.id,
+                      title: activeSlidePhoto.title,
+                      description: activeSlidePhoto.description,
+                      category: activeSlidePhoto.category,
+                      url: activeSlidePhoto.url,
+                      isDefault: activeSlidePhoto.isDefault
+                    })}
+                    className="inline-flex items-center gap-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                    title="Admin: Editar esta publicación"
+                  >
+                    <Edit3 className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Editar</span>
+                  </button>
 
-            {/* Title & Description of Current Photo */}
-            <div className="space-y-2">
-              <h2 className="text-2xl sm:text-4xl md:text-5xl font-black text-white uppercase tracking-tight leading-tight drop-shadow-xl max-w-2xl mx-auto">
-                {activeSlidePhoto.title}
-              </h2>
-              {activeSlidePhoto.description && (
-                <p className="text-xs sm:text-sm text-zinc-300 max-w-lg mx-auto leading-relaxed drop-shadow-md">
-                  {activeSlidePhoto.description}
-                </p>
+                  <button
+                    onClick={() => handleDeletePublication(activeSlidePhoto)}
+                    className="inline-flex items-center gap-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-300 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                    title="Admin: Eliminar esta publicación"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Eliminar</span>
+                  </button>
+
+                  <input 
+                    type="file" 
+                    ref={trainingInputRef}
+                    accept="image/*"
+                    multiple
+                    onChange={handleQuickTrainingUpload}
+                    className="hidden"
+                  />
+                </div>
               )}
             </div>
 
-            {/* Action Bar: Comments Button + Like + Lightbox */}
-            <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-              
-              {/* DIRECT COMMENT BUTTON FOR THIS PUBLICATION */}
-              <button
-                onClick={() => setActiveCommentsModal({
-                  mediaId: activeSlidePhoto.id,
-                  mediaTitle: activeSlidePhoto.title,
-                  mediaUrl: activeSlidePhoto.url,
-                  mediaCategory: activeSlidePhoto.category
-                })}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-900/90 hover:bg-zinc-800 text-white font-bold text-xs uppercase tracking-wider border border-zinc-700 shadow-xl backdrop-blur-md transition-all hover:scale-105 cursor-pointer group"
-              >
-                <MessageSquare className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
-                <span>Comentar Publicación</span>
-                <span className="bg-amber-400/20 text-amber-300 text-[10px] font-black px-2 py-0.5 rounded-full">
-                  {commentsCounts[activeSlidePhoto.id] || 0}
-                </span>
-              </button>
+            {/* Complete Training Photo Container (Not cropped background) */}
+            <div className="relative bg-black rounded-3xl border border-zinc-800 p-2 sm:p-4 shadow-2xl overflow-hidden">
+              <div className="relative w-full flex items-center justify-center bg-zinc-950 rounded-2xl overflow-hidden min-h-[260px] sm:min-h-[380px] max-h-[520px]">
+                <img 
+                  key={activeSlidePhoto.id + '-' + activeSlidePhoto.url}
+                  src={activeSlidePhoto.url} 
+                  alt={activeSlidePhoto.title} 
+                  className="w-full h-auto max-h-[520px] object-contain mx-auto rounded-xl animate-fade-in transition-all duration-500"
+                />
+              </div>
 
-              {/* LIKE BUTTON */}
-              <button
-                onClick={() => handleLikePost(activeSlidePhoto.id)}
-                className={`inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider border backdrop-blur-md transition-all hover:scale-105 cursor-pointer ${
-                  likedPosts[activeSlidePhoto.id]
-                    ? 'bg-rose-500/20 text-rose-300 border-rose-500/50'
-                    : 'bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 hover:text-white border-zinc-700'
-                }`}
-                title="Me gusta esta foto"
-              >
-                <Heart className={`w-4 h-4 ${likedPosts[activeSlidePhoto.id] ? 'fill-current text-rose-500' : 'text-rose-400'}`} />
-                <span>Me Gusta</span>
-              </button>
+              {/* Navigation Arrows on Left and Right of the Photo */}
+              <div className="absolute inset-y-0 left-4 z-20 flex items-center">
+                <button
+                  onClick={handlePrevSlide}
+                  className="p-2 sm:p-3 rounded-full bg-black/80 hover:bg-black text-white border border-white/20 hover:border-white/50 backdrop-blur-md transition-transform hover:scale-110 cursor-pointer shadow-2xl"
+                  title="Foto anterior"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+              </div>
 
-              {/* FULLSCREEN LIGHTBOX */}
-              <button
-                onClick={() => setSelectedPhotoModal({
-                  url: activeSlidePhoto.url,
-                  title: activeSlidePhoto.title,
-                  description: activeSlidePhoto.description,
-                  tag: activeSlidePhoto.tag
-                })}
-                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 hover:text-white font-bold text-xs uppercase tracking-wider border border-zinc-700 backdrop-blur-md transition-all hover:scale-105 cursor-pointer"
-                title="Ver en pantalla completa"
-              >
-                <Maximize2 className="w-4 h-4" />
-                <span>Ampliar</span>
-              </button>
-
+              <div className="absolute inset-y-0 right-4 z-20 flex items-center">
+                <button
+                  onClick={handleNextSlide}
+                  className="p-2 sm:p-3 rounded-full bg-black/80 hover:bg-black text-white border border-white/20 hover:border-white/50 backdrop-blur-md transition-transform hover:scale-110 cursor-pointer shadow-2xl"
+                  title="Siguiente foto"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
-            {/* Thumbnail Navigation Dots */}
-            <div className="flex items-center justify-center gap-1.5 pt-4">
-              {rotatingPhotos.slice(0, 8).map((_, idx) => (
+            {/* Words, Details & Interactive Actions (UNDERNEATH the Training Photo) */}
+            <div className="text-center space-y-4 max-w-3xl mx-auto pt-2">
+              
+              {/* Category Badge and Rotation Controls */}
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <span 
+                  className="px-3.5 py-1 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-widest text-black shadow-lg"
+                  style={{ backgroundColor: '#ccff00' }}
+                >
+                  {activeSlidePhoto.category || 'ENTRENAMIENTO OFICIAL'}
+                </span>
+
                 <button
-                  key={idx}
-                  onClick={() => setCurrentSlideIndex(idx)}
-                  className={`h-1.5 rounded-full transition-all cursor-pointer ${
-                    currentSlideIndex === idx 
-                      ? 'w-6 bg-lime-400' 
-                      : 'w-1.5 bg-zinc-600 hover:bg-zinc-400'
+                  onClick={handleRandomSlide}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wider bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700 transition-colors cursor-pointer"
+                  title="Cambiar foto aleatoriamente"
+                >
+                  <Shuffle className="w-3 h-3 text-amber-400" />
+                  <span>Foto Aleatoria</span>
+                </button>
+
+                <button
+                  onClick={() => setIsAutoRotating(!isAutoRotating)}
+                  className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border transition-colors cursor-pointer ${
+                    isAutoRotating 
+                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' 
+                      : 'bg-zinc-800 text-zinc-400 border-zinc-700'
                   }`}
-                  title={`Foto ${idx + 1}`}
-                />
-              ))}
+                  title="Pausar o activar rotación automática"
+                >
+                  {isAutoRotating ? '● Rotación Activa' : '○ Pausado'}
+                </button>
+              </div>
+
+              {/* Title & Description of Active Photo */}
+              <div className="space-y-1.5">
+                <h3 className="text-xl sm:text-3xl font-black text-white uppercase tracking-tight leading-tight">
+                  {activeSlidePhoto.title}
+                </h3>
+                {activeSlidePhoto.description && (
+                  <p className="text-xs sm:text-sm text-zinc-300 max-w-xl mx-auto leading-relaxed">
+                    {activeSlidePhoto.description}
+                  </p>
+                )}
+              </div>
+
+              {/* Interactive Buttons (Comments, Like, Lightbox) */}
+              <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                
+                {/* Comment on this publication */}
+                <button
+                  onClick={() => setActiveCommentsModal({
+                    mediaId: activeSlidePhoto.id,
+                    mediaTitle: activeSlidePhoto.title,
+                    mediaUrl: activeSlidePhoto.url,
+                    mediaCategory: activeSlidePhoto.category
+                  })}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-xs uppercase tracking-wider border border-zinc-700 shadow-xl transition-all hover:scale-105 cursor-pointer group"
+                >
+                  <MessageSquare className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
+                  <span>Comentar Publicación</span>
+                  <span className="bg-amber-400/20 text-amber-300 text-[10px] font-black px-2 py-0.5 rounded-full">
+                    {commentsCounts[activeSlidePhoto.id] || 0}
+                  </span>
+                </button>
+
+                {/* Like Button */}
+                <button
+                  onClick={() => handleLikePost(activeSlidePhoto.id)}
+                  className={`inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider border transition-all hover:scale-105 cursor-pointer ${
+                    likedPosts[activeSlidePhoto.id]
+                      ? 'bg-rose-500/20 text-rose-300 border-rose-500/50'
+                      : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border-zinc-700'
+                  }`}
+                  title="Me gusta esta foto"
+                >
+                  <Heart className={`w-4 h-4 ${likedPosts[activeSlidePhoto.id] ? 'fill-current text-rose-500' : 'text-rose-400'}`} />
+                  <span>Me Gusta</span>
+                </button>
+
+                {/* Fullscreen Lightbox */}
+                <button
+                  onClick={() => setSelectedPhotoModal({
+                    url: activeSlidePhoto.url,
+                    title: activeSlidePhoto.title,
+                    description: activeSlidePhoto.description,
+                    tag: activeSlidePhoto.tag
+                  })}
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white font-bold text-xs uppercase tracking-wider border border-zinc-700 transition-all hover:scale-105 cursor-pointer"
+                  title="Ver en pantalla completa"
+                >
+                  <Maximize2 className="w-4 h-4" />
+                  <span>Ampliar</span>
+                </button>
+
+              </div>
+
+              {/* Navigation Indicator Dots */}
+              <div className="flex items-center justify-center gap-1.5 pt-3">
+                {rotatingPhotos.slice(0, 8).map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setCurrentSlideIndex(idx)}
+                    className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                      currentSlideIndex === idx 
+                        ? 'w-6 bg-lime-400' 
+                        : 'w-1.5 bg-zinc-600 hover:bg-zinc-400'
+                    }`}
+                    title={`Foto ${idx + 1}`}
+                  />
+                ))}
+              </div>
+
             </div>
 
           </div>
-
         </section>
 
 
         {/* =========================================================================
             SECTION 3: PUBLIC PUBLICATIONS & TRAINING GALLERY FEED
-            - Each post created by the Admin can be commented on
+            - Complete photos with Admin Edit & Delete buttons
            ========================================================================= */}
         <section className="py-14 sm:py-20 bg-zinc-950 border-b border-zinc-800">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -710,7 +861,7 @@ export function Home() {
                   Publicaciones Oficiales del Club
                 </h2>
                 <p className="text-xs sm:text-sm text-zinc-400 max-w-xl mt-1">
-                  Todas las fotos y sesiones del cuerpo técnico. Haz clic en "Comentar" en cualquier publicación para compartir tu opinión.
+                  Todas las fotos y sesiones del cuerpo técnico. Comenta cualquier publicación para interactuar con el club.
                 </p>
               </div>
 
@@ -733,8 +884,8 @@ export function Home() {
                   key={photo.id + '-grid-' + idx}
                   className="bg-zinc-900/80 border border-zinc-800 hover:border-zinc-700 rounded-3xl overflow-hidden shadow-xl flex flex-col transition-all duration-300 hover:shadow-2xl group"
                 >
-                  {/* Photo Frame */}
-                  <div className="relative h-56 bg-black overflow-hidden cursor-pointer"
+                  {/* Photo Frame (Complete presentation) */}
+                  <div className="relative h-60 bg-black overflow-hidden flex items-center justify-center cursor-pointer"
                     onClick={() => setSelectedPhotoModal({
                       url: photo.url,
                       title: photo.title,
@@ -756,6 +907,33 @@ export function Home() {
                         {photo.category}
                       </span>
                     </div>
+
+                    {/* Admin Edit & Delete buttons on card */}
+                    {role === 'admin' && (
+                      <div className="absolute top-3 right-3 flex items-center gap-1 z-10" onClick={e => e.stopPropagation()}>
+                        <button
+                          onClick={() => setEditingPost({
+                            id: photo.id,
+                            title: photo.title,
+                            description: photo.description,
+                            category: photo.category,
+                            url: photo.url,
+                            isDefault: photo.isDefault
+                          })}
+                          className="p-1.5 bg-black/80 hover:bg-zinc-800 text-amber-300 rounded-lg border border-amber-500/40 transition-colors"
+                          title="Editar publicación"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeletePublication(photo)}
+                          className="p-1.5 bg-black/80 hover:bg-red-900/60 text-red-300 rounded-lg border border-red-500/40 transition-colors"
+                          title="Eliminar publicación"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
 
                     <button
                       className="absolute bottom-3 right-3 p-2 bg-black/80 text-white rounded-xl border border-white/20 hover:scale-110 transition-transform opacity-0 group-hover:opacity-100"
@@ -1053,6 +1231,131 @@ export function Home() {
                 {selectedPhotoModal.description}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Admin Edit Publication Modal */}
+      {editingPost && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 animate-fade-in"
+          onClick={() => setEditingPost(null)}
+        >
+          <div 
+            className="relative max-w-lg w-full bg-zinc-950 border border-zinc-800 rounded-3xl overflow-hidden shadow-2xl space-y-4 p-6"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-amber-500/20 text-amber-400 rounded-xl">
+                  <Edit3 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-base">Editar Publicación</h3>
+                  <p className="text-xs text-zinc-400">Modifica los datos de esta foto o cambia la imagen</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setEditingPost(null)}
+                className="p-2 text-zinc-400 hover:text-white bg-zinc-900 rounded-xl"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-zinc-300 uppercase tracking-wider mb-1.5">
+                  Foto de la Publicación
+                </label>
+                <div className="flex items-center gap-3">
+                  <img 
+                    src={editingPost.url} 
+                    alt="Preview" 
+                    className="w-20 h-20 object-cover rounded-xl border border-zinc-700 bg-black"
+                  />
+                  <div className="flex-1">
+                    <input 
+                      type="file" 
+                      id="edit-post-file-input"
+                      accept="image/*"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          try {
+                            const compressed = await compressImageFile(file, 1600, 1200, 0.85);
+                            setEditingPost({ ...editingPost, url: compressed });
+                          } catch (err) {
+                            console.error("Error al comprimir imagen:", err);
+                          }
+                        }
+                      }}
+                      className="text-xs text-zinc-400 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-zinc-800 file:text-zinc-200 hover:file:bg-zinc-700 cursor-pointer"
+                    />
+                    <p className="text-[10px] text-zinc-500 mt-1">Sube una nueva foto si deseas reemplazar la actual</p>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-zinc-300 uppercase tracking-wider mb-1.5">
+                  Título de la Publicación
+                </label>
+                <input 
+                  type="text" 
+                  value={editingPost.title}
+                  onChange={e => setEditingPost({ ...editingPost, title: e.target.value })}
+                  className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-lime-400"
+                  placeholder="Ej. Sesión Táctica de Remate"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-zinc-300 uppercase tracking-wider mb-1.5">
+                  Categoría
+                </label>
+                <select 
+                  value={editingPost.category}
+                  onChange={e => setEditingPost({ ...editingPost, category: e.target.value })}
+                  className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-lime-400"
+                >
+                  <option value="Entrenamientos">Entrenamientos</option>
+                  <option value="Tácticas">Tácticas</option>
+                  <option value="Torneos">Torneos</option>
+                  <option value="Preparación Física">Preparación Física</option>
+                  <option value="Gimnasio">Gimnasio</option>
+                  <option value="Oficial">Oficial</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-zinc-300 uppercase tracking-wider mb-1.5">
+                  Descripción o Detalles
+                </label>
+                <textarea 
+                  value={editingPost.description}
+                  onChange={e => setEditingPost({ ...editingPost, description: e.target.value })}
+                  rows={3}
+                  className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-lime-400 resize-none"
+                  placeholder="Escribe detalles del entrenamiento o sesión..."
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  onClick={() => setEditingPost(null)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-zinc-400 hover:text-white bg-zinc-900 hover:bg-zinc-800"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSavePublicationEdit}
+                  className="px-5 py-2 rounded-xl text-xs font-black uppercase tracking-wider bg-lime-400 hover:bg-lime-300 text-black shadow-lg cursor-pointer"
+                >
+                  Guardar Cambios
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
