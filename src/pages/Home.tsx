@@ -993,7 +993,7 @@ export function Home() {
             - Acceso a entrenamientos y videos por tiempo limitado
             - Verificación de membresía del usuario o solicitud de renovación
            ========================================================================= */}
-        <PrivatePlatformSection />
+        {!settings.hidePrivatePlatform && <PrivatePlatformSection />}
 
 
         {/* =========================================================================

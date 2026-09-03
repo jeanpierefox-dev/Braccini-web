@@ -23,6 +23,7 @@ export interface ClubSettings {
   
   // Misión y Visión Institucional (Editable y Eliminable solo por Admin)
   showMissionVision?: boolean;
+  hidePrivatePlatform?: boolean;
   missionTitle?: string;
   missionText?: string;
   visionTitle?: string;

@@ -72,6 +72,7 @@ import {
   Layers,
   X,
   Edit2,
+  Edit3,
   DollarSign
 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -102,12 +103,15 @@ export function AdminPanel() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [commentsList, setCommentsList] = useState<ClubComment[]>([]);
 
-  // User Creation State
+  // User Creation / Edit State
   const [newUserUsername, setNewUserUsername] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserName, setNewUserName] = useState('');
   const [newUserClubRole, setNewUserClubRole] = useState<'jugador' | 'entrenador'>('jugador');
+  const [newUserCategory, setNewUserCategory] = useState('Categoría Libre');
+  const [newUserFeeExempt, setNewUserFeeExempt] = useState(false);
   const [isAddingUser, setIsAddingUser] = useState(false);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
 
   // Payment Form State
   const [paymentUser, setPaymentUser] = useState('');
@@ -119,7 +123,7 @@ export function AdminPanel() {
   });
   const [isAddingPayment, setIsAddingPayment] = useState(false);
   const [receiptToPrint, setReceiptToPrint] = useState<Payment | null>(null);
-  const [treasuryView, setTreasuryView] = useState<'registro' | 'mensualidades' | 'uniformes'>('registro');
+  const [treasuryView, setTreasuryView] = useState<'dashboard' | 'registro' | 'mensualidades' | 'uniformes'>('dashboard');
   const [selectedMonth, setSelectedMonth] = useState(() => { 
     const d = new Date(); 
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; 
@@ -201,6 +205,7 @@ export function AdminPanel() {
 
   // Misión y Visión
   const [configShowMissionVision, setConfigShowMissionVision] = useState(true);
+  const [configHidePrivatePlatform, setConfigHidePrivatePlatform] = useState(false);
   const [configMissionTitle, setConfigMissionTitle] = useState('Nuestra Misión');
   const [configMissionText, setConfigMissionText] = useState('Formar atletas íntegros de alto rendimiento en voleibol...');
   const [configVisionTitle, setConfigVisionTitle] = useState('Nuestra Visión');
@@ -251,6 +256,7 @@ export function AdminPanel() {
     if (appSettings.socialTikTok) setConfigSocialTikTok(appSettings.socialTikTok);
 
     if (typeof appSettings.showMissionVision === 'boolean') setConfigShowMissionVision(appSettings.showMissionVision);
+    if (typeof appSettings.hidePrivatePlatform === 'boolean') setConfigHidePrivatePlatform(appSettings.hidePrivatePlatform);
     if (appSettings.missionTitle) setConfigMissionTitle(appSettings.missionTitle);
     if (appSettings.missionText) setConfigMissionText(appSettings.missionText);
     if (appSettings.visionTitle) setConfigVisionTitle(appSettings.visionTitle);
@@ -678,12 +684,12 @@ export function AdminPanel() {
 
   const handleAddUser = async (e: FormEvent) => {
     e.preventDefault();
-    if (!newUserUsername || !newUserPassword || !newUserName) {
-      alert('Todos los campos son obligatorios');
+    if (!newUserUsername || !newUserName) {
+      alert('Nombre completo y nombre de usuario son obligatorios');
       return;
     }
 
-    if (newUserPassword.length < 6) {
+    if (!editingUserId && newUserPassword.length < 6) {
       alert('La contraseña debe tener al menos 6 caracteres');
       return;
     }
@@ -691,57 +697,126 @@ export function AdminPanel() {
     setIsAddingUser(true);
     const cleanUsername = newUserUsername.toLowerCase().trim();
     const generatedEmail = `${cleanUsername}@club.com`;
-    const appName = `SecondaryApp_${Date.now()}`;
-    let createdUid: string | null = null;
-    let secondaryAppInstance: any = null;
+    let createdUid: string | null = editingUserId;
 
     try {
-      // 1. Intentar creación en Firebase Auth vía secondary app
-      try {
-        secondaryAppInstance = initializeApp(firebaseConfig, appName);
-        const secondaryAuth = getAuth(secondaryAppInstance);
+      if (editingUserId) {
+        // Edit existing user
+        const updatePayload: any = {
+          name: newUserName.trim(),
+          username: cleanUsername,
+          clubRole: newUserClubRole,
+          category: newUserCategory,
+          isFeeExempt: newUserFeeExempt,
+        };
         
-        const userCredential = await createUserWithEmailAndPassword(
-          secondaryAuth,
-          generatedEmail,
-          newUserPassword
-        );
-        createdUid = userCredential.user.uid;
-      } catch (authErr: any) {
-        console.warn("Firebase Auth secondary creation failed, saving to Firestore directly:", authErr);
-        // Si el usuario ya existe en Auth o falla la creación remota, generamos un doc id único
-        createdUid = `user_${cleanUsername}_${Date.now()}`;
-      }
+        if (newUserPassword.trim().length >= 6) {
+           updatePayload.password = newUserPassword;
+        }
 
-      // 2. Guardar ficha del usuario en Firestore
-      await setDoc(doc(db, 'users', createdUid), {
-        name: newUserName.trim(),
-        email: generatedEmail,
-        username: cleanUsername,
-        password: newUserPassword, // Permite inicio de sesión local para socios y jugadores
-        role: 'member',
-        clubRole: newUserClubRole,
-        photoURL: '',
-        createdAt: serverTimestamp(),
-      });
+        await updateDoc(doc(db, 'users', editingUserId), updatePayload);
+        alert(`¡Ficha de @${cleanUsername} actualizada exitosamente!`);
+      } else {
+        // Create new user
+        const appName = `SecondaryApp_${Date.now()}`;
+        let secondaryAppInstance: any = null;
+        try {
+          // 1. Intentar creación en Firebase Auth vía secondary app
+          try {
+            secondaryAppInstance = initializeApp(firebaseConfig, appName);
+            const secondaryAuth = getAuth(secondaryAppInstance);
+            
+            const userCredential = await createUserWithEmailAndPassword(
+              secondaryAuth,
+              generatedEmail,
+              newUserPassword
+            );
+            createdUid = userCredential.user.uid;
+          } catch (authErr: any) {
+            console.warn("Firebase Auth secondary creation failed, saving to Firestore directly:", authErr);
+            createdUid = `user_${cleanUsername}_${Date.now()}`;
+          }
+
+          // 2. Guardar ficha del usuario en Firestore
+          await setDoc(doc(db, 'users', createdUid), {
+            name: newUserName.trim(),
+            email: generatedEmail,
+            username: cleanUsername,
+            password: newUserPassword,
+            role: 'member',
+            clubRole: newUserClubRole,
+            category: newUserCategory,
+            isFeeExempt: newUserFeeExempt,
+            photoURL: '',
+            createdAt: serverTimestamp(),
+          });
+
+          // 3. Inicializar cuota si no está exonerado y es jugador
+          if (newUserClubRole === 'jugador' && !newUserFeeExempt) {
+            const d = new Date();
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const monthPeriod = `${y}-${m}`;
+            const monthFormatted = format(d, "MMMM yyyy", { locale: es });
+            const monthName = monthFormatted.charAt(0).toUpperCase() + monthFormatted.slice(1);
+            
+            await addDoc(collection(db, 'monthly_fees'), {
+              userId: createdUid,
+              userName: newUserName.trim(),
+              userCategory: newUserCategory,
+              monthPeriod,
+              monthName,
+              amount: 100,
+              paidAmount: 0,
+              status: 'pendiente',
+              dueDate: `${y}-${m}-15`,
+              createdAt: serverTimestamp()
+            });
+          }
+
+          alert(`¡Usuario @${cleanUsername} registrado exitosamente!`);
+        } finally {
+          if (secondaryAppInstance) {
+            try {
+              await deleteApp(secondaryAppInstance);
+            } catch (e) {}
+          }
+        }
+      }
 
       setNewUserUsername('');
       setNewUserPassword('');
       setNewUserName('');
       setNewUserClubRole('jugador');
-      alert(`¡Usuario @${cleanUsername} registrado exitosamente! Ya puede iniciar sesión con su usuario y contraseña.`);
+      setNewUserCategory('Categoría Libre');
+      setNewUserFeeExempt(false);
+      setEditingUserId(null);
     } catch (err: any) {
-      console.error("Error al registrar usuario:", err);
-      alert('Error al registrar usuario: ' + (err.message || 'Error desconocido'));
+      console.error("Error al registrar/editar usuario:", err);
+      alert('Error: ' + (err.message || 'Error desconocido'));
     } finally {
-      if (secondaryAppInstance) {
-        try {
-          await deleteApp(secondaryAppInstance);
-        } catch (e) {
-          // Ignorar limpieza
-        }
-      }
       setIsAddingUser(false);
+    }
+  };
+
+  const handleEditUserClick = (u: UserProfile) => {
+    setNewUserName(u.name || '');
+    setNewUserUsername(u.username || '');
+    setNewUserPassword(''); // blank implies keeping old password
+    setNewUserClubRole(u.clubRole as any || 'jugador');
+    setNewUserCategory(u.category || 'Categoría Libre');
+    setNewUserFeeExempt(!!u.isFeeExempt);
+    setEditingUserId(u.id!);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleDeleteUser = async (id: string) => {
+    if (!window.confirm('¿Eliminar este registro de forma permanente?')) return;
+    try {
+      await deleteDoc(doc(db, 'users', id));
+    } catch (err) {
+      console.error(err);
+      alert('Error al eliminar');
     }
   };
 
@@ -1124,6 +1199,7 @@ export function AdminPanel() {
         socialFacebook: configSocialFacebook.trim(),
         socialTikTok: configSocialTikTok.trim(),
         showMissionVision: configShowMissionVision,
+        hidePrivatePlatform: configHidePrivatePlatform,
         missionTitle: configMissionTitle.trim(),
         missionText: configMissionText.trim(),
         visionTitle: configVisionTitle.trim(),
@@ -1184,7 +1260,8 @@ export function AdminPanel() {
     contactLocation: configContactLocation,
     socialInstagram: configSocialInstagram,
     socialFacebook: configSocialFacebook,
-    socialTikTok: configSocialTikTok
+    socialTikTok: configSocialTikTok,
+    hidePrivatePlatform: configHidePrivatePlatform
   };
 
   // Real-time count of registered players & staff (Strictly EXCLUDES admin role from player count)
@@ -1897,9 +1974,27 @@ export function AdminPanel() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in">
             <div className="lg:col-span-1">
               <div className="bg-zinc-900/70 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6 shadow-xl">
-                <h3 className="text-base sm:text-lg font-bold text-white mb-4 border-b border-zinc-800 pb-3 flex items-center gap-2">
-                  <UserIcon className="w-4 h-4" style={{ color: configPrimaryColor }} />
-                  <span>Crear Nuevo Integrante</span>
+                <h3 className="text-base sm:text-lg font-bold text-white mb-4 border-b border-zinc-800 pb-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <UserIcon className="w-4 h-4" style={{ color: configPrimaryColor }} />
+                    <span>{editingUserId ? 'Editar Integrante' : 'Crear Nuevo Integrante'}</span>
+                  </div>
+                  {editingUserId && (
+                    <button 
+                      onClick={() => {
+                        setEditingUserId(null);
+                        setNewUserUsername('');
+                        setNewUserName('');
+                        setNewUserPassword('');
+                        setNewUserClubRole('jugador');
+                        setNewUserCategory('Categoría Libre');
+                        setNewUserFeeExempt(false);
+                      }}
+                      className="text-xs text-zinc-400 hover:text-white"
+                    >
+                      Cancelar
+                    </button>
+                  )}
                 </h3>
                 
                 <form onSubmit={handleAddUser} className="space-y-4">
@@ -1922,23 +2017,26 @@ export function AdminPanel() {
                       type="text" 
                       value={newUserUsername}
                       onChange={(e) => setNewUserUsername(e.target.value)}
-                      className="w-full rounded-xl border-zinc-800 border bg-black text-white px-3.5 py-2.5 text-sm focus:ring-2 outline-none"
+                      className="w-full rounded-xl border-zinc-800 border bg-black text-white px-3.5 py-2.5 text-sm focus:ring-2 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                       style={{ ['--tw-ring-color' as any]: configPrimaryColor }}
                       placeholder="Ej. cmendoza"
                       required
+                      disabled={!!editingUserId}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-zinc-400 mb-1.5">Contraseña Inicial</label>
+                    <label className="block text-xs font-semibold text-zinc-400 mb-1.5">
+                      {editingUserId ? 'Nueva Contraseña (dejar en blanco para no cambiar)' : 'Contraseña Inicial'}
+                    </label>
                     <input 
                       type="password" 
                       value={newUserPassword}
                       onChange={(e) => setNewUserPassword(e.target.value)}
                       className="w-full rounded-xl border-zinc-800 border bg-black text-white px-3.5 py-2.5 text-sm focus:ring-2 outline-none"
                       style={{ ['--tw-ring-color' as any]: configPrimaryColor }}
-                      placeholder="Mínimo 6 caracteres"
-                      required
+                      placeholder={editingUserId ? "Cambiar contraseña..." : "Mínimo 6 caracteres"}
+                      required={!editingUserId}
                     />
                   </div>
 
@@ -1955,6 +2053,36 @@ export function AdminPanel() {
                     </select>
                   </div>
 
+                  <div>
+                    <label className="block text-xs font-semibold text-zinc-400 mb-1.5">Categoría / Grupo</label>
+                    <select
+                      value={newUserCategory}
+                      onChange={(e) => setNewUserCategory(e.target.value)}
+                      className="w-full rounded-xl border-zinc-800 border bg-black text-white px-3.5 py-2.5 text-sm focus:ring-2 outline-none"
+                      style={{ ['--tw-ring-color' as any]: configPrimaryColor }}
+                    >
+                      <option value="Categoría Libre">Categoría Libre</option>
+                      <option value="U12">U12 / Infantil</option>
+                      <option value="U14">U14 / Menores</option>
+                      <option value="U16">U16 / Cadetes</option>
+                      <option value="U18">U18 / Juvenil</option>
+                      <option value="Mayores">Mayores / Primera</option>
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-2 mt-2">
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={newUserFeeExempt} 
+                        onChange={e => setNewUserFeeExempt(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+                    </label>
+                    <span className="text-xs text-zinc-400 font-semibold">Exonerado de Cuotas Mensuales (Becado)</span>
+                  </div>
+
                   <button 
                     type="submit" 
                     disabled={isAddingUser}
@@ -1964,7 +2092,7 @@ export function AdminPanel() {
                       boxShadow: `0 4px 14px rgba(${primaryRgbObj.r}, ${primaryRgbObj.g}, ${primaryRgbObj.b}, 0.4)`
                     }}
                   >
-                    {isAddingUser ? 'Creando...' : 'Crear Usuario'}
+                    {isAddingUser ? 'Guardando...' : (editingUserId ? 'Guardar Cambios' : 'Crear Usuario')}
                   </button>
                 </form>
               </div>
@@ -2091,21 +2219,37 @@ export function AdminPanel() {
                               </span>
                             </td>
                             <td className="px-5 py-4 text-right">
-                              {!isUserAdmin ? (
+                              <div className="flex items-center justify-end gap-2">
+                                {!isUserAdmin ? (
+                                  <button
+                                    onClick={() => handleUpdateRole(u.id, 'admin')}
+                                    className="text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-1.5 rounded-lg font-medium transition-colors"
+                                  >
+                                    Hacer Admin
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => handleUpdateRole(u.id, 'member')}
+                                    className="text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-400 px-3 py-1.5 rounded-lg font-medium transition-colors"
+                                  >
+                                    Quitar Admin
+                                  </button>
+                                )}
                                 <button
-                                  onClick={() => handleUpdateRole(u.id, 'admin')}
-                                  className="text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-1.5 rounded-lg font-medium transition-colors"
+                                  onClick={() => handleEditUserClick(u)}
+                                  className="p-1.5 text-zinc-400 hover:text-white bg-zinc-800 hover:bg-zinc-700 rounded-lg transition-colors"
+                                  title="Editar"
                                 >
-                                  Hacer Admin
+                                  <Edit3 className="w-4 h-4" />
                                 </button>
-                              ) : (
                                 <button
-                                  onClick={() => handleUpdateRole(u.id, 'member')}
-                                  className="text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-400 px-3 py-1.5 rounded-lg font-medium transition-colors"
+                                  onClick={() => handleDeleteUser(u.id)}
+                                  className="p-1.5 text-zinc-400 hover:text-red-400 bg-zinc-800 hover:bg-red-500/20 rounded-lg transition-colors"
+                                  title="Eliminar"
                                 >
-                                  Quitar Admin
+                                  <Trash2 className="w-4 h-4" />
                                 </button>
-                              )}
+                              </div>
                             </td>
                           </tr>
                         );
@@ -2123,6 +2267,7 @@ export function AdminPanel() {
           <div className="space-y-6 animate-fade-in">
             <div className="flex flex-wrap gap-2 border-b border-zinc-800 pb-3">
               {[
+                { id: 'dashboard', label: 'Dashboard Financiero' },
                 { id: 'registro', label: 'Registrar Pago' },
                 { id: 'mensualidades', label: 'Control de Mensualidades' },
                 { id: 'uniformes', label: 'Control de Uniformes' },
@@ -2143,6 +2288,110 @@ export function AdminPanel() {
                 </button>
               ))}
             </div>
+
+            {treasuryView === 'dashboard' && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-zinc-900/80 p-5 rounded-2xl border border-zinc-800 shadow-lg">
+                    <span className="text-zinc-400 font-bold text-[10px] uppercase tracking-widest block mb-2">Ingresos Totales (Mes Actual)</span>
+                    <h3 className="text-3xl font-black text-white">
+                      S/ {monthlyFees.filter(f => f.monthPeriod === feeMonthFilter).reduce((acc, curr) => acc + (Number(curr.paidAmount) || 0), 0).toFixed(2)}
+                    </h3>
+                  </div>
+                  <div className="bg-zinc-900/80 p-5 rounded-2xl border border-zinc-800 shadow-lg">
+                    <span className="text-zinc-400 font-bold text-[10px] uppercase tracking-widest block mb-2">Por Cobrar (Mes Actual)</span>
+                    <h3 className="text-3xl font-black text-amber-400">
+                      S/ {monthlyFees.filter(f => f.monthPeriod === feeMonthFilter).reduce((acc, curr) => {
+                        const amount = Number(curr.amount) || 0;
+                        const paid = Number(curr.paidAmount) || 0;
+                        return acc + Math.max(0, amount - paid);
+                      }, 0).toFixed(2)}
+                    </h3>
+                  </div>
+                  <div className="bg-zinc-900/80 p-5 rounded-2xl border border-zinc-800 shadow-lg">
+                    <span className="text-zinc-400 font-bold text-[10px] uppercase tracking-widest block mb-2">Deuda Total Histórica</span>
+                    <h3 className="text-3xl font-black text-red-400">
+                      S/ {monthlyFees.reduce((acc, curr) => {
+                        const amount = Number(curr.amount) || 0;
+                        const paid = Number(curr.paidAmount) || 0;
+                        return acc + Math.max(0, amount - paid);
+                      }, 0).toFixed(2)}
+                    </h3>
+                  </div>
+                  <div className="bg-zinc-900/80 p-5 rounded-2xl border border-zinc-800 shadow-lg">
+                    <span className="text-zinc-400 font-bold text-[10px] uppercase tracking-widest block mb-2">Jugadores Activos</span>
+                    <h3 className="text-3xl font-black text-emerald-400">
+                      {users.filter(u => u.clubRole === 'jugador').length}
+                    </h3>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Pagos Vencidos / Pendientes */}
+                  <div className="bg-zinc-900/70 border border-zinc-800 rounded-2xl p-6 shadow-xl">
+                    <div className="flex items-center justify-between border-b border-zinc-800 pb-4 mb-4">
+                      <h4 className="font-bold text-white text-sm">Mensualidades Pendientes de Pago</h4>
+                      <span className="bg-red-500/20 text-red-400 text-[10px] font-bold px-2 py-0.5 rounded-full">Atención Requerida</span>
+                    </div>
+                    <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                      {monthlyFees.filter(f => {
+                        const amount = Number(f.amount) || 0;
+                        const paid = Number(f.paidAmount) || 0;
+                        return amount > paid;
+                      }).sort((a, b) => {
+                        const diffA = (Number(a.amount) || 0) - (Number(a.paidAmount) || 0);
+                        const diffB = (Number(b.amount) || 0) - (Number(b.paidAmount) || 0);
+                        return diffB - diffA; // Sort by highest debt first
+                      }).slice(0, 15).map(f => {
+                        const pending = (Number(f.amount) || 0) - (Number(f.paidAmount) || 0);
+                        return (
+                          <div key={f.id} className="flex items-center justify-between bg-black/40 p-3 rounded-xl border border-zinc-800">
+                            <div>
+                              <p className="font-bold text-sm text-white">{f.userName}</p>
+                              <p className="text-[10px] text-zinc-500 font-mono uppercase">{f.monthName} • {f.userCategory || 'Sin categoría'}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-black text-red-400 font-mono">S/ {pending.toFixed(2)}</p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {monthlyFees.filter(f => (Number(f.amount) || 0) > (Number(f.paidAmount) || 0)).length === 0 && (
+                        <div className="text-center text-zinc-500 text-xs py-8">
+                          No hay deudas pendientes registradas.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Últimos Pagos Registrados */}
+                  <div className="bg-zinc-900/70 border border-zinc-800 rounded-2xl p-6 shadow-xl">
+                    <div className="flex items-center justify-between border-b border-zinc-800 pb-4 mb-4">
+                      <h4 className="font-bold text-white text-sm">Últimos Recibos Emitidos</h4>
+                      <button onClick={() => setTreasuryView('registro')} className="text-xs text-blue-400 hover:text-blue-300 font-bold">Ver todos</button>
+                    </div>
+                    <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                      {payments.slice(0, 10).map(p => (
+                        <div key={p.id} className="flex items-center justify-between bg-black/40 p-3 rounded-xl border border-zinc-800">
+                          <div>
+                            <p className="font-bold text-sm text-white">{p.userName}</p>
+                            <p className="text-[10px] text-zinc-500 font-mono uppercase">{p.concept} • {p.createdAt ? format(p.createdAt.toDate(), "dd/MM") : 'Hoy'}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-black text-emerald-400 font-mono">S/ {Number(p.amount).toFixed(2)}</p>
+                          </div>
+                        </div>
+                      ))}
+                      {payments.length === 0 && (
+                        <div className="text-center text-zinc-500 text-xs py-8">
+                          No hay pagos recientes.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {treasuryView === 'registro' && (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -3514,7 +3763,30 @@ export function AdminPanel() {
               </div>
             </div>
 
-            {/* SECTION 6: MISIÓN Y VISIÓN INSTITUCIONAL */}
+            {/* SECTION 6: PLATAFORMA PRIVADA VISIBILITY */}
+            <div className="bg-zinc-900/70 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6 sm:p-8 shadow-xl space-y-5">
+              <div className="border-b border-zinc-800 pb-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Eye className="w-5 h-5" style={{ color: configPrimaryColor }} />
+                  <h3 className="font-bold text-white text-base sm:text-lg">Acceso a Plataforma Privada</h3>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={!configHidePrivatePlatform} 
+                    onChange={e => setConfigHidePrivatePlatform(!e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                </label>
+              </div>
+
+              <p className="text-xs text-zinc-400">
+                Muestra u oculta los botones y secciones de "Plataforma Privada" y "Acceso a Miembros" en la página pública principal.
+              </p>
+            </div>
+
+            {/* SECTION 7: MISIÓN Y VISIÓN INSTITUCIONAL */}
             <div className="bg-zinc-900/70 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6 sm:p-8 shadow-xl space-y-5">
               <div className="border-b border-zinc-800 pb-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
