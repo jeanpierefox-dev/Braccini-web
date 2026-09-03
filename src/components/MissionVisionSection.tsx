@@ -145,13 +145,13 @@ export function MissionVisionSection() {
             <div className="flex items-center gap-2 mb-2">
               <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: primaryColor }} />
               <span 
-                className="text-xs font-black uppercase tracking-[0.25em]"
+                className="text-xs font-heading font-black uppercase tracking-[0.25em]"
                 style={{ color: accentColor }}
               >
                 Identidad y Propósito Institucional
               </span>
             </div>
-            <h2 className="text-2xl sm:text-4xl font-black text-white tracking-tight uppercase">
+            <h2 className="text-2xl sm:text-4xl font-heading font-black text-white tracking-tight uppercase">
               Misión, Visión y Valores
             </h2>
             <p className="text-sm sm:text-base text-zinc-400 mt-1 max-w-2xl">
@@ -206,7 +206,7 @@ export function MissionVisionSection() {
             </span>
             <button
               onClick={handleToggleVisibility}
-              className="px-3 py-1 rounded-lg bg-amber-500 text-black font-black text-[11px] uppercase tracking-wider"
+              className="px-3 py-1 rounded-lg bg-amber-500 text-black font-heading font-black text-[11px] uppercase tracking-wider"
             >
               Publicar / Mostrar
             </button>
@@ -354,121 +354,104 @@ export function MissionVisionSection() {
         ) : null}
 
         {/* CORPORATE DISPLAY CARDS */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 pt-4">
           
           {/* Card 1: MISIÓN */}
-          <div className="lg:col-span-6 bg-gradient-to-br from-zinc-900/90 to-zinc-950 rounded-2xl p-6 sm:p-8 border border-zinc-800 shadow-xl relative overflow-hidden group hover:border-zinc-700 transition-all">
+          <div className="bg-zinc-950 rounded-2xl p-8 sm:p-10 border border-zinc-800 shadow-2xl relative overflow-hidden group hover:border-zinc-700 transition-colors">
             <div 
-              className="absolute top-0 left-0 right-0 h-1"
+              className="absolute top-0 left-0 right-0 h-1.5 transition-transform origin-left scale-x-100 group-hover:scale-x-105"
               style={{ backgroundColor: primaryColor }}
             />
-            <div className="flex items-center gap-3.5 mb-5">
-              <div 
-                className="w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-lg shrink-0"
-                style={{ 
-                  backgroundColor: `rgba(${primaryRgb}, 0.15)`,
-                  color: primaryColor,
-                  border: `1px solid rgba(${primaryRgb}, 0.3)`
-                }}
-              >
-                <Target className="w-6 h-6" />
+            <div className="flex flex-col gap-6">
+              <div className="flex items-center gap-4">
+                <div 
+                  className="w-14 h-14 rounded-xl flex items-center justify-center shrink-0 shadow-inner border border-zinc-800/50"
+                  style={{ backgroundColor: `rgba(${primaryRgb}, 0.1)`, color: primaryColor }}
+                >
+                  <Target className="w-7 h-7" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-heading font-black uppercase tracking-[0.2em] text-zinc-500 block mb-1">
+                    Rumbo Deportivo
+                  </span>
+                  <h3 className="text-xl sm:text-2xl font-heading font-black text-white uppercase tracking-tight">
+                    {settings.missionTitle || 'Nuestra Misión'}
+                  </h3>
+                </div>
               </div>
-              <div>
-                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 block">
-                  Rumbo Deportivo
-                </span>
-                <h3 className="text-lg sm:text-xl font-black text-white uppercase tracking-tight">
-                  {settings.missionTitle || 'Nuestra Misión'}
-                </h3>
-              </div>
-            </div>
-
-            <p className="text-sm sm:text-base text-zinc-300 leading-relaxed">
-              {settings.missionText || missionText}
-            </p>
-
-            <div className="mt-6 pt-5 border-t border-zinc-800/80 flex items-center gap-2 text-xs font-bold text-zinc-400">
-              <ShieldCheck className="w-4 h-4" style={{ color: primaryColor }} />
-              <span>Compromiso formativo con cada deportista del club</span>
+              <p className="text-sm sm:text-base text-zinc-400 leading-relaxed">
+                {settings.missionText || missionText}
+              </p>
             </div>
           </div>
 
           {/* Card 2: VISIÓN */}
-          <div className="lg:col-span-6 bg-gradient-to-br from-zinc-900/90 to-zinc-950 rounded-2xl p-6 sm:p-8 border border-zinc-800 shadow-xl relative overflow-hidden group hover:border-zinc-700 transition-all">
+          <div className="bg-zinc-950 rounded-2xl p-8 sm:p-10 border border-zinc-800 shadow-2xl relative overflow-hidden group hover:border-zinc-700 transition-colors">
             <div 
-              className="absolute top-0 left-0 right-0 h-1"
+              className="absolute top-0 left-0 right-0 h-1.5 transition-transform origin-left scale-x-100 group-hover:scale-x-105"
               style={{ backgroundColor: accentColor }}
             />
-            <div className="flex items-center gap-3.5 mb-5">
-              <div 
-                className="w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-lg shrink-0"
-                style={{ 
-                  backgroundColor: `rgba(${accentRgb}, 0.15)`,
-                  color: accentColor,
-                  border: `1px solid rgba(${accentRgb}, 0.3)`
-                }}
-              >
-                <Compass className="w-6 h-6" />
+            <div className="flex flex-col gap-6">
+              <div className="flex items-center gap-4">
+                <div 
+                  className="w-14 h-14 rounded-xl flex items-center justify-center shrink-0 shadow-inner border border-zinc-800/50"
+                  style={{ backgroundColor: `rgba(${accentRgb}, 0.1)`, color: accentColor }}
+                >
+                  <Compass className="w-7 h-7" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-heading font-black uppercase tracking-[0.2em] text-zinc-500 block mb-1">
+                    Proyección y Futuro
+                  </span>
+                  <h3 className="text-xl sm:text-2xl font-heading font-black text-white uppercase tracking-tight">
+                    {settings.visionTitle || 'Nuestra Visión'}
+                  </h3>
+                </div>
               </div>
-              <div>
-                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 block">
-                  Proyección y Futuro
-                </span>
-                <h3 className="text-lg sm:text-xl font-black text-white uppercase tracking-tight">
-                  {settings.visionTitle || 'Nuestra Visión'}
-                </h3>
-              </div>
-            </div>
-
-            <p className="text-sm sm:text-base text-zinc-300 leading-relaxed">
-              {settings.visionText || visionText}
-            </p>
-
-            <div className="mt-6 pt-5 border-t border-zinc-800/80 flex items-center gap-2 text-xs font-bold text-zinc-400">
-              <Award className="w-4 h-4" style={{ color: accentColor }} />
-              <span>Liderazgo competitivo y excelencia formativa</span>
+              <p className="text-sm sm:text-base text-zinc-400 leading-relaxed">
+                {settings.visionText || visionText}
+              </p>
             </div>
           </div>
 
           {/* Row 3: PILARES Y VALORES INSTITUCIONALES */}
-          <div className="lg:col-span-12 bg-zinc-900/60 rounded-2xl p-6 sm:p-8 border border-zinc-800/90 shadow-xl">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-              <div className="flex items-center gap-3">
+          <div className="lg:col-span-2 mt-4 bg-zinc-950 rounded-2xl p-8 sm:p-10 border border-zinc-800 shadow-2xl relative overflow-hidden">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-8 border-b border-zinc-900 pb-6">
+              <div className="flex items-center gap-4">
                 <div 
-                  className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow"
-                  style={{ backgroundColor: primaryColor }}
+                  className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 shadow-inner border border-zinc-800/50"
+                  style={{ backgroundColor: `rgba(${primaryRgb}, 0.1)`, color: primaryColor }}
                 >
-                  <Layers className="w-5 h-5" />
+                  <Layers className="w-6 h-6" />
                 </div>
                 <div>
-                  <h4 className="text-base sm:text-lg font-black text-white uppercase tracking-tight">
-                    {settings.valuesTitle || 'Pilares y Valores Institucionales'}
+                  <h4 className="text-lg sm:text-xl font-heading font-black text-white uppercase tracking-tight">
+                    {settings.valuesTitle || 'Valores Institucionales'}
                   </h4>
-                  <span className="text-xs text-zinc-400">La filosofía deportiva que rige nuestros entrenamientos y competencias</span>
+                  <p className="text-xs sm:text-sm text-zinc-500 mt-1">La filosofía deportiva que rige nuestros entrenamientos y competencias</p>
                 </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {(settings.valuesList && settings.valuesList.length > 0 ? settings.valuesList : valuesList).map((val, idx) => (
                 <div 
                   key={idx}
-                  className="bg-zinc-950 p-4 rounded-xl border border-zinc-800/80 flex items-start gap-3 hover:border-zinc-700 transition-colors"
+                  className="flex items-center gap-3 p-4 rounded-xl bg-zinc-900/50 border border-zinc-800/50 transition-colors hover:bg-zinc-900 hover:border-zinc-700"
                 >
-                  <span 
-                    className="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-black text-white shrink-0 mt-0.5"
-                    style={{ backgroundColor: `rgba(${primaryRgb}, 0.2)`, color: primaryColor }}
+                  <div 
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-heading font-black shrink-0"
+                    style={{ backgroundColor: `rgba(${idx % 2 === 0 ? primaryRgb : accentRgb}, 0.1)`, color: idx % 2 === 0 ? primaryColor : accentColor }}
                   >
                     {idx + 1}
-                  </span>
-                  <span className="text-xs sm:text-sm font-semibold text-zinc-200 leading-snug">
+                  </div>
+                  <span className="text-sm font-semibold text-zinc-300 leading-snug">
                     {val}
                   </span>
                 </div>
               ))}
             </div>
           </div>
-
         </div>
 
       </div>

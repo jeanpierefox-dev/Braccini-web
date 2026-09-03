@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+@theme {
+  --font-heading: 'Montserrat', sans-serif;
+  --font-body: 'Plus Jakarta Sans', sans-serif;
+}
+
 :root {
   --club-primary: #2563eb;
   --club-primary-rgb: 37, 99, 235;

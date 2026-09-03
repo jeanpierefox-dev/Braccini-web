@@ -54,7 +54,8 @@ import {
   Trash2,
   Shield,
   Layers,
-  Filter
+  Filter,
+  Share2
 } from 'lucide-react';
 import { MediaItem } from '../types';
 import { compressImageFile } from '../utils/imageCompressor';
@@ -484,7 +485,7 @@ export function Home() {
         
         {/* Toast Alert for Admin Actions */}
         {quickUploadSuccess && (
-          <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-emerald-500/20 border border-emerald-500/50 text-emerald-300 px-5 py-3 rounded-2xl flex items-center gap-2.5 text-xs font-black shadow-2xl backdrop-blur-xl animate-fade-in">
+          <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-emerald-500/20 border border-emerald-500/50 text-emerald-300 px-5 py-3 rounded-2xl flex items-center gap-2.5 text-xs font-heading font-black shadow-2xl backdrop-blur-xl animate-fade-in">
             <Check className="w-4 h-4 text-emerald-400" />
             <span>{quickUploadSuccess}</span>
           </div>
@@ -502,24 +503,18 @@ export function Home() {
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
             
             {/* Escudo del Club Destacado y Agrandado en la parte superior */}
-            <div className="flex flex-col items-center justify-center text-center space-y-3">
+            <div className="flex flex-col items-center justify-center text-center space-y-3 z-10 relative">
               {settings.logoUrl ? (
-                <div 
-                  className="relative p-2 rounded-3xl bg-zinc-900 border-2 shadow-2xl transition-transform hover:scale-105"
-                  style={{
-                    borderColor: primaryColor,
-                    boxShadow: `0 0 35px rgba(${primaryRgb}, 0.3)`
-                  }}
-                >
+                <div className="relative transition-transform hover:scale-105">
                   <img 
                     src={settings.logoUrl} 
                     alt="Logo Oficial del Club" 
-                    className="w-24 h-24 sm:w-32 sm:h-32 object-contain rounded-2xl drop-shadow-2xl" 
+                    className="w-32 h-32 sm:w-48 sm:h-48 md:w-56 md:h-56 object-contain drop-shadow-2xl" 
                   />
                 </div>
               ) : (
                 <div 
-                  className="w-24 h-24 sm:w-32 sm:h-32 rounded-3xl flex items-center justify-center font-black text-white text-4xl sm:text-5xl shadow-2xl border-2 border-white/20"
+                  className="w-24 h-24 sm:w-32 sm:h-32 rounded-3xl flex items-center justify-center font-heading font-black text-white text-4xl sm:text-5xl shadow-2xl border-2 border-white/20"
                   style={{ backgroundColor: primaryColor }}
                 >
                   {settings.appName ? settings.appName.charAt(0) : 'C'}
@@ -528,7 +523,7 @@ export function Home() {
 
               <div className="space-y-1">
                 <span 
-                  className="text-xs sm:text-sm font-black uppercase tracking-[0.3em]"
+                  className="text-xs sm:text-sm font-heading font-black uppercase tracking-[0.3em]"
                   style={{ color: accentColor }}
                 >
                   {settings.appName || 'CLUB DEPORTIVO OFICIAL'}
@@ -541,13 +536,13 @@ export function Home() {
               </div>
             </div>
 
-            {/* Contenedor de Imagen de Portada Completa (No cortada de fondo) */}
-            <div className="relative bg-zinc-950 rounded-3xl border border-zinc-800 p-2 sm:p-4 shadow-2xl overflow-hidden group">
-              <div className="relative w-full flex items-center justify-center bg-black/95 rounded-2xl overflow-hidden min-h-[280px] sm:min-h-[420px] max-h-[560px]">
+            {/* Contenedor de Imagen de Portada Completa (Sin recuadro) */}
+            <div className="relative group w-full -mt-6 sm:-mt-10 z-0">
+              <div className="relative w-full flex items-center justify-center">
                 <img 
                   src={mainHeroPhoto} 
                   alt={settings.heroTitle || "Portada Oficial del Club"} 
-                  className="w-full h-auto max-h-[560px] object-contain mx-auto rounded-xl shadow-inner transition-transform duration-500 group-hover:scale-[1.01]"
+                  className="w-full h-auto max-h-[70vh] object-cover mx-auto transition-transform duration-500 group-hover:scale-[1.01]"
                 />
               </div>
 
@@ -557,7 +552,7 @@ export function Home() {
                   <button
                     onClick={() => mainHeroInputRef.current?.click()}
                     disabled={isUploadingMainHero}
-                    className="inline-flex items-center gap-2 bg-black/90 hover:bg-black text-amber-300 hover:text-white px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider border border-amber-500/60 shadow-2xl backdrop-blur-md transition-all hover:scale-105 cursor-pointer"
+                    className="inline-flex items-center gap-2 bg-black/90 hover:bg-black text-amber-300 hover:text-white px-4 py-2.5 rounded-xl text-xs font-heading font-black uppercase tracking-wider border border-amber-500/60 shadow-2xl backdrop-blur-md transition-all hover:scale-105 cursor-pointer"
                     title="Solo Administrador: Cambiar imagen de portada principal"
                   >
                     {isUploadingMainHero ? (
@@ -587,7 +582,7 @@ export function Home() {
             {/* Palabras y botones colocados DEBAJO de la imagen de portada */}
             <div className="text-center space-y-6 max-w-4xl mx-auto pt-2">
               
-              <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-white uppercase tracking-tight leading-tight drop-shadow-xl">
+              <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-heading font-black text-white uppercase tracking-tight leading-tight drop-shadow-xl">
                 {settings.heroTitle ? (
                   settings.heroTitle
                 ) : (
@@ -605,7 +600,7 @@ export function Home() {
                   <>
                     <button
                       onClick={() => setShowLogin(true)}
-                      className="w-full sm:w-auto px-8 sm:px-10 py-3.5 sm:py-4 rounded-xl font-black text-xs sm:text-sm uppercase tracking-[0.2em] text-white shadow-2xl transition-transform hover:scale-105 active:scale-95 cursor-pointer min-h-[48px] flex items-center justify-center gap-2"
+                      className="w-full sm:w-auto px-8 sm:px-10 py-3.5 sm:py-4 rounded-xl font-heading font-black text-xs sm:text-sm uppercase tracking-[0.2em] text-white shadow-2xl transition-transform hover:scale-105 active:scale-95 cursor-pointer min-h-[48px] flex items-center justify-center gap-2"
                       style={{
                         backgroundColor: primaryColor,
                         boxShadow: `0 10px 30px rgba(${primaryRgb}, 0.4)`
@@ -627,7 +622,7 @@ export function Home() {
                   <>
                     <a
                       href="#dashboard"
-                      className="w-full sm:w-auto px-8 sm:px-10 py-3.5 sm:py-4 font-black text-xs sm:text-sm uppercase tracking-[0.2em] text-white shadow-2xl transition-transform hover:scale-105 cursor-pointer min-h-[48px] flex items-center justify-center gap-2 rounded-xl"
+                      className="w-full sm:w-auto px-8 sm:px-10 py-3.5 sm:py-4 font-heading font-black text-xs sm:text-sm uppercase tracking-[0.2em] text-white shadow-2xl transition-transform hover:scale-105 cursor-pointer min-h-[48px] flex items-center justify-center gap-2 rounded-xl"
                       style={{
                         backgroundColor: primaryColor,
                         boxShadow: `0 10px 30px rgba(${primaryRgb}, 0.4)`
@@ -646,19 +641,24 @@ export function Home() {
                   </>
                 )}
               </div>
-
             </div>
 
-            {/* CARRUSEL DE FOTOS ALEATORIAS DE ENTRENAMIENTO Y ACCIÓN */}
+            {/* =========================================================================
+                SECCIÓN 2: MISIÓN, VISIÓN Y VALORES INSTITUCIONALES DEL CLUB
+                (Movido justo debajo de la portada)
+               ========================================================================= */}
+            <MissionVisionSection />
+
+            {/* CARRUSEL DE FOTOS DE ENTRENAMIENTO Y ACCIÓN */}
             <div className="pt-10 border-t border-zinc-900 space-y-6">
               
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div>
-                  <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.2em] text-amber-400">
+                  <div className="flex items-center gap-2 text-xs font-heading font-black uppercase tracking-[0.2em] text-amber-400">
                     <Activity className="w-4 h-4" />
                     <span>Momentos de Entrenamiento y Cancha</span>
                   </div>
-                  <h3 className="text-xl sm:text-2xl font-black text-white mt-0.5">
+                  <h3 className="text-xl sm:text-2xl font-heading font-black text-white mt-0.5">
                     Fotos de Acción Deportiva
                   </h3>
                 </div>
@@ -684,9 +684,9 @@ export function Home() {
                 )}
               </div>
 
-              {/* Visor de Foto Activa */}
-              <div className="relative bg-zinc-950 rounded-3xl border border-zinc-800 p-2 sm:p-4 shadow-2xl overflow-hidden">
-                <div className="relative w-full flex items-center justify-center bg-black rounded-2xl overflow-hidden min-h-[260px] sm:min-h-[380px] max-h-[520px]">
+            {/* Visor de Foto Activa */}
+            <div className="relative w-full rounded-3xl group">
+              <div className="relative w-full flex items-center justify-center bg-black overflow-hidden min-h-[260px] sm:min-h-[380px] max-h-[520px]">
                   <img 
                     key={activeSlidePhoto.id + '-' + activeSlidePhoto.url}
                     src={activeSlidePhoto.url} 
@@ -717,39 +717,20 @@ export function Home() {
                 </div>
               </div>
 
-              {/* Palabras y controles DEBAJO de la foto aleatoria */}
+              {/* Palabras y controles DEBAJO de la foto */}
               <div className="text-center space-y-4 max-w-3xl mx-auto pt-2">
                 
                 <div className="flex flex-wrap items-center justify-center gap-2">
                   <span 
-                    className="px-3.5 py-1 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-widest text-white shadow-lg"
+                    className="px-3.5 py-1 rounded-full text-[10px] sm:text-xs font-heading font-black uppercase tracking-widest text-white shadow-lg"
                     style={{ backgroundColor: primaryColor }}
                   >
                     {activeSlidePhoto.categoryLabel || 'ENTRENAMIENTO OFICIAL'}
                   </span>
-
-                  <button
-                    onClick={handleRandomSlide}
-                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wider bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700 transition-colors cursor-pointer"
-                  >
-                    <Shuffle className="w-3 h-3 text-amber-400" />
-                    <span>Foto Aleatoria</span>
-                  </button>
-
-                  <button
-                    onClick={() => setIsAutoRotating(!isAutoRotating)}
-                    className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border transition-colors cursor-pointer ${
-                      isAutoRotating 
-                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' 
-                        : 'bg-zinc-800 text-zinc-400 border-zinc-700'
-                    }`}
-                  >
-                    {isAutoRotating ? '● Rotación Activa' : '○ Pausado'}
-                  </button>
                 </div>
 
                 <div className="space-y-1.5">
-                  <h3 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight">
+                  <h3 className="text-xl sm:text-2xl font-heading font-black text-white uppercase tracking-tight">
                     {activeSlidePhoto.title}
                   </h3>
                   {activeSlidePhoto.description && (
@@ -771,7 +752,7 @@ export function Home() {
                   >
                     <MessageSquare className="w-4 h-4 text-amber-400" />
                     <span>Comentar Publicación</span>
-                    <span className="bg-amber-400/20 text-amber-300 text-[10px] font-black px-2 py-0.5 rounded-full">
+                    <span className="bg-amber-400/20 text-amber-300 text-[10px] font-heading font-black px-2 py-0.5 rounded-full">
                       {commentsCounts[activeSlidePhoto.id] || 0}
                     </span>
                   </button>
@@ -800,6 +781,24 @@ export function Home() {
                     <Maximize2 className="w-4 h-4" />
                     <span>Ampliar</span>
                   </button>
+
+                  <button
+                    onClick={() => {
+                      if (navigator.share) {
+                        navigator.share({
+                          title: activeSlidePhoto.title,
+                          text: activeSlidePhoto.description,
+                          url: window.location.href,
+                        }).catch(()=>console.log("Error sharing"));
+                      } else {
+                        alert("La opción de compartir no está disponible en este dispositivo/navegador.");
+                      }
+                    }}
+                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white font-bold text-xs uppercase tracking-wider border border-zinc-700 transition-all hover:scale-105 cursor-pointer"
+                  >
+                    <Share2 className="w-4 h-4 text-blue-400" />
+                    <span>Compartir</span>
+                  </button>
                 </div>
 
               </div>
@@ -808,14 +807,6 @@ export function Home() {
 
           </div>
         </section>
-
-
-        {/* =========================================================================
-            SECCIÓN 2: MISIÓN, VISIÓN Y VALORES INSTITUCIONALES DEL CLUB
-            - Solo editable/eliminable por el Administrador
-            - Tarjetas formales corporativas
-           ========================================================================= */}
-        <MissionVisionSection />
 
 
         {/* =========================================================================
@@ -834,7 +825,7 @@ export function Home() {
                   <Activity className="w-4 h-4" />
                   <span>Galería de Actividades y Eventos</span>
                 </div>
-                <h2 className="text-2xl sm:text-4xl font-black text-white uppercase tracking-tight">
+                <h2 className="text-2xl sm:text-4xl font-heading font-black text-white uppercase tracking-tight">
                   Publicaciones Oficiales
                 </h2>
                 <p className="text-xs sm:text-sm text-zinc-400 max-w-xl mt-1">
@@ -899,7 +890,7 @@ export function Home() {
                     
                     <div className="absolute top-3 left-3">
                       <span 
-                        className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider text-white shadow-lg backdrop-blur-md"
+                        className="px-2.5 py-1 rounded-full text-[10px] font-heading font-black uppercase tracking-wider text-white shadow-lg backdrop-blur-md"
                         style={{
                           backgroundColor: photo.category === 'entrenos' ? primaryColor : (photo.category === 'partidos' ? '#ef4444' : accentColor)
                         }}
@@ -1031,7 +1022,7 @@ export function Home() {
             <div className="p-4 sm:p-5 border-b border-zinc-800 flex items-center justify-between bg-zinc-900">
               <div className="flex items-center gap-2.5">
                 {selectedPhotoModal.tag && (
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400 text-black">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-heading font-black uppercase tracking-wider bg-amber-400 text-black">
                     {selectedPhotoModal.tag}
                   </span>
                 )}
@@ -1178,7 +1169,7 @@ export function Home() {
                 <button
                   onClick={handleSavePublicationEdit}
                   disabled={isSavingPostEdit}
-                  className="px-5 py-2 rounded-xl text-xs font-black uppercase tracking-wider bg-amber-500 hover:bg-amber-400 text-black shadow-lg cursor-pointer flex items-center gap-2"
+                  className="px-5 py-2 rounded-xl text-xs font-heading font-black uppercase tracking-wider bg-amber-500 hover:bg-amber-400 text-black shadow-lg cursor-pointer flex items-center gap-2"
                 >
                   {isSavingPostEdit ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                   <span>Guardar Cambios</span>
