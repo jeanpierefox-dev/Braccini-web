@@ -3,11 +3,14 @@ import { collection, addDoc, serverTimestamp, query, onSnapshot, orderBy, delete
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { UserProfile, MediaItem, MediaCategory, UserRole, Payment, ClubSettings, ThemeMode, ClubComment, UniformOrder, MonthlyFeeRecord } from '../types';
+import { AdminSettingsTab } from '../components/AdminSettingsTab';
+import { AdminUsersTab } from '../components/AdminUsersTab';
+import { AdminMediaTab } from '../components/AdminMediaTab';
 import { Upload, Trash2, Shield, User as UserIcon, LayoutTemplate, Activity, Settings, Wallet, Printer, Plus, Palette, Eye, Smartphone, CheckCircle, Megaphone, Trophy, Sparkles, RefreshCw, Phone, Mail, MapPin, Instagram, Facebook, FileText, MessageSquare, Star, CornerDownRight, ShieldCheck, Filter, Check, Send, Building2, AlertCircle, Shirt, FileDown, FileSpreadsheet, Layers, X, Edit2, Edit3, DollarSign, CheckSquare } from "lucide-react";
 
 export function AdminPanel() {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState('finances');
+  const [activeTab, setActiveTab] = useState('settings');
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [monthlyFees, setMonthlyFees] = useState<MonthlyFeeRecord[]>([]);
   const [uniformOrders, setUniformOrders] = useState<UniformOrder[]>([]);
@@ -84,18 +87,20 @@ export function AdminPanel() {
 
         {/* Tabs */}
         <div className="flex overflow-x-auto gap-2 border-b border-zinc-800 pb-2">
-          {['finances', 'uniforms', 'users'].map(tab => (
+          {['settings', 'finances', 'uniforms', 'media', 'users'].map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
               className={`px-4 py-2 rounded-lg text-sm font-semibold capitalize ${activeTab === tab ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-900 text-zinc-400'}`}
             >
-              {tab === 'finances' ? 'Mensualidades' : tab === 'uniforms' ? 'Uniformes' : 'Usuarios'}
+              {tab === 'settings' ? 'Configuración' : tab === 'finances' ? 'Mensualidades' : tab === 'uniforms' ? 'Uniformes' : tab === 'media' ? 'Biblioteca' : 'Usuarios'}
             </button>
           ))}
         </div>
 
         {/* Tab Content */}
+                {activeTab === 'settings' && <AdminSettingsTab />}
+        
         {activeTab === 'finances' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center bg-zinc-900 p-4 rounded-xl border border-zinc-800">
@@ -151,36 +156,8 @@ export function AdminPanel() {
           </div>
         )}
 
-        {activeTab === 'users' && (
-          <div className="space-y-4 bg-zinc-900 p-4 rounded-xl border border-zinc-800">
-            <h2 className="text-xl font-bold">Gestión de Usuarios</h2>
-            <div className="space-y-2">
-              {users.map(u => (
-                <div key={u.id} className="bg-black p-3 rounded-lg border border-zinc-800 flex justify-between items-center">
-                  <div>
-                    <p className="font-bold">{u.name || u.email}</p>
-                    <p className="text-xs text-zinc-400">Rol: {u.role} | Club Rol: {u.clubRole}</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <select
-                      value={u.clubRole || ''}
-                      onChange={async (e) => {
-                        await updateDoc(doc(db, 'users', u.id), { clubRole: e.target.value });
-                      }}
-                      className="bg-zinc-900 text-xs border border-zinc-800 rounded px-2 py-1"
-                    >
-                      <option value="">Ninguno</option>
-                      <option value="jugador">Jugador</option>
-                      <option value="entrenador">Entrenador</option>
-                      <option value="director">Director</option>
-                      <option value="administrador">Administrador</option>
-                    </select>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {activeTab === 'media' && <AdminMediaTab />}
+        {activeTab === 'users' && <AdminUsersTab />}
       </div>
 
       {showMatrixModal && (

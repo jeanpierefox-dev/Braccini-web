@@ -118,6 +118,7 @@ const DEFAULT_ACTION_PHOTOS = [
 
 import { Eye, Building2, User as UserIcon } from "lucide-react";
 
+const isVideo = (url?: string) => url && (url.includes('youtube.com') || url.includes('youtu.be') || url.includes('vimeo.com') || url.match(/\.(mp4|webm|ogg)$/i));
 export function Home() {
   useEffect(() => {
     // Increment page views
@@ -138,6 +139,7 @@ export function Home() {
   const settings = useSettings();
   const { isTrialActive, daysRemaining, currentDay, startTrial } = useVisitorTrial();
 
+    const [activeVideoUrl, setActiveVideoUrl] = useState<string | null>(null);
   const [dbMedia, setDbMedia] = useState<MediaItem[]>([]);
   const [loadingMedia, setLoadingMedia] = useState(true);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
@@ -499,6 +501,16 @@ export function Home() {
     }
   };
 
+    const handleMediaClick = (url: string) => {
+    if (isVideo(url)) {
+      if (!user) {
+        setShowLogin(true);
+      } else {
+        setActiveVideoUrl(url);
+      }
+    }
+  };
+
   const handleActivateTrial = () => {
     startTrial();
     window.location.hash = '#dashboard';
@@ -785,13 +797,23 @@ export function Home() {
 
             {/* Visor de Foto Activa */}
             <div className="relative w-full rounded-3xl group">
-              <div className="relative w-full flex items-center justify-center bg-black overflow-hidden min-h-[260px] sm:min-h-[380px] max-h-[520px]">
-                  <img 
-                    key={activeSlidePhoto.id + '-' + activeSlidePhoto.url}
-                    src={activeSlidePhoto.url} 
-                    alt={activeSlidePhoto.title} 
-                    className="w-full h-auto max-h-[520px] object-contain mx-auto rounded-xl animate-fade-in transition-all duration-500"
-                  />
+              <div 
+                  className="relative w-full flex items-center justify-center bg-black overflow-hidden min-h-[260px] sm:min-h-[380px] max-h-[520px] group/video cursor-pointer"
+                  onClick={() => handleMediaClick(activeSlidePhoto.url)}
+                >
+                  {isVideo(activeSlidePhoto.url) ? (
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-zinc-900 rounded-xl relative group-hover/video:bg-zinc-800 transition-colors">
+                       <Play className="w-16 h-16 text-zinc-600 group-hover/video:text-white transition-colors" />
+                       <span className="text-zinc-500 text-sm mt-4 font-bold group-hover/video:text-white transition-colors">Ver Video</span>
+                    </div>
+                  ) : (
+                    <img 
+                      key={activeSlidePhoto.id + '-' + activeSlidePhoto.url}
+                      src={activeSlidePhoto.url} 
+                      alt={activeSlidePhoto.title} 
+                      className="w-full h-auto max-h-[520px] object-contain mx-auto rounded-xl animate-fade-in transition-all duration-500"
+                    />
+                  )}
                 </div>
 
                 {/* Flechas de Navegación */}
@@ -1289,6 +1311,36 @@ export function Home() {
           mediaCategory={activeCommentsModal.mediaCategory}
           onClose={() => setActiveCommentsModal(null)}
         />
+      )}
+
+      
+      {/* Video Player Modal */}
+      {activeVideoUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/90 backdrop-blur-sm">
+          <div className="relative w-full max-w-5xl bg-black border border-zinc-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="flex justify-between items-center p-4 border-b border-zinc-800 absolute top-0 left-0 right-0 z-10 bg-black/50 backdrop-blur-md">
+              <h3 className="font-bold text-white uppercase tracking-wider text-xs">Reproductor Institucional</h3>
+              <button 
+                onClick={() => setActiveVideoUrl(null)}
+                className="w-8 h-8 rounded-full bg-zinc-900 hover:bg-zinc-800 flex items-center justify-center text-white transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="w-full flex-1 aspect-video flex items-center justify-center pt-16">
+              {activeVideoUrl.includes('youtube.com') || activeVideoUrl.includes('youtu.be') ? (
+                <iframe 
+                  className="w-full h-full"
+                  src={activeVideoUrl.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')} 
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                  allowFullScreen
+                ></iframe>
+              ) : (
+                <video src={activeVideoUrl} controls autoPlay className="w-full h-full max-h-full object-contain"></video>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Footer */}
