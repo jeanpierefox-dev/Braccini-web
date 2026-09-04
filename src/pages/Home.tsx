@@ -124,9 +124,9 @@ export function Home() {
     const incrementViews = async () => {
       try {
         const settingsRef = doc(db, 'settings', 'club_profile');
-        await updateDoc(settingsRef, {
+        await setDoc(settingsRef, {
           pageViews: increment(1)
-        });
+        }, { merge: true });
       } catch (e) {
         console.error("Error incrementing page views", e);
       }
