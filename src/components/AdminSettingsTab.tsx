@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { ClubSettings } from '../types';
-import { Save, Loader2, Image as ImageIcon, Settings2, Palette, Shield } from 'lucide-react';
+import { Save, Loader2, Image as ImageIcon, Settings2, Palette, Shield, Upload } from 'lucide-react';
+import { compressImageFile } from '../utils/imageCompressor';
 
 export function AdminSettingsTab() {
   const [settings, setSettings] = useState<Partial<ClubSettings>>({});
@@ -127,17 +128,32 @@ export function AdminSettingsTab() {
 
           <div>
             <label className="block text-xs font-semibold text-zinc-400 mb-1 flex items-center justify-between">
-              Logo (URL)
+              Logo (Local)
               {settings.logoUrl && <img src={settings.logoUrl} alt="Logo preview" className="w-6 h-6 object-contain" />}
             </label>
             <input 
-              type="text" 
-              name="logoUrl" 
-              value={settings.logoUrl || ''} 
-              onChange={handleChange}
-              className="w-full bg-black border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 outline-none"
-              placeholder="https://..."
+              type="file" 
+              accept="image/*"
+              className="hidden"
+              id="upload-logo"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  try {
+                    setSaving(true);
+                    const dataUrl = await compressImageFile(file, 800, 800, 0.85);
+                    setSettings(prev => ({ ...prev, logoUrl: dataUrl }));
+                  } catch(err) { console.error(err); } finally { setSaving(false); }
+                }
+              }}
             />
+            <button 
+              type="button"
+              onClick={() => document.getElementById('upload-logo')?.click()}
+              className="w-full bg-black hover:bg-zinc-800 border border-zinc-800 rounded-lg px-3 py-2 text-sm flex justify-center items-center gap-2 transition-colors text-zinc-300"
+            >
+              <Upload className="w-4 h-4" /> Seleccionar Imagen de Logo
+            </button>
           </div>
         </div>
 
@@ -190,31 +206,62 @@ export function AdminSettingsTab() {
 
           <div>
             <label className="block text-xs font-semibold text-zinc-400 mb-1 flex items-center justify-between">
-              Fondo de Portada / Hero (URL)
+              Fondo de Portada / Hero (Local)
               {settings.heroBgUrl && <img src={settings.heroBgUrl} alt="Hero preview" className="w-10 h-6 object-cover rounded" />}
             </label>
             <input 
-              type="text" 
-              name="heroBgUrl" 
-              value={settings.heroBgUrl || ''} 
-              onChange={handleChange}
-              className="w-full bg-black border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 outline-none"
-              placeholder="https://..."
+              type="file" 
+              accept="image/*"
+              className="hidden"
+              id="upload-hero"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  try {
+                    setSaving(true);
+                    const dataUrl = await compressImageFile(file, 1600, 900, 0.85);
+                    setSettings(prev => ({ ...prev, heroBgUrl: dataUrl }));
+                  } catch(err) { console.error(err); } finally { setSaving(false); }
+                }
+              }}
             />
+            <button 
+              type="button"
+              onClick={() => document.getElementById('upload-hero')?.click()}
+              className="w-full bg-black hover:bg-zinc-800 border border-zinc-800 rounded-lg px-3 py-2 text-sm flex justify-center items-center gap-2 transition-colors text-zinc-300"
+            >
+              <Upload className="w-4 h-4" /> Seleccionar Imagen de Portada
+            </button>
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-zinc-400 mb-1 flex items-center justify-between">
-              Foto Oficial del Equipo Principal (URL)
+              Foto Oficial del Equipo Principal (Local)
+              {settings.mainTeamImageUrl && <img src={settings.mainTeamImageUrl} alt="Team preview" className="w-10 h-6 object-cover rounded" />}
             </label>
             <input 
-              type="text" 
-              name="mainTeamImageUrl" 
-              value={settings.mainTeamImageUrl || ''} 
-              onChange={handleChange}
-              className="w-full bg-black border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 outline-none"
-              placeholder="https://..."
+              type="file" 
+              accept="image/*"
+              className="hidden"
+              id="upload-team"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  try {
+                    setSaving(true);
+                    const dataUrl = await compressImageFile(file, 1600, 900, 0.85);
+                    setSettings(prev => ({ ...prev, mainTeamImageUrl: dataUrl }));
+                  } catch(err) { console.error(err); } finally { setSaving(false); }
+                }
+              }}
             />
+            <button 
+              type="button"
+              onClick={() => document.getElementById('upload-team')?.click()}
+              className="w-full bg-black hover:bg-zinc-800 border border-zinc-800 rounded-lg px-3 py-2 text-sm flex justify-center items-center gap-2 transition-colors text-zinc-300"
+            >
+              <Upload className="w-4 h-4" /> Seleccionar Foto del Equipo
+            </button>
           </div>
         </div>
       </div>
