@@ -4,6 +4,7 @@ export type MediaCategory = 'entrenos' | 'partidos' | 'paseos' | 'institucional'
 export type ThemeMode = 'dark' | 'midnight' | 'club-contrast' | 'slate';
 
 export interface ClubSettings {
+  pageViews?: number;
   appName: string;
   slogan?: string;
   description?: string;
@@ -67,6 +68,7 @@ export interface ClubSettings {
   
   autoColorExtracted?: boolean;
   hiddenDefaultPublications?: string[];
+  playerCategories?: string[];
 }
 
 export interface ClubComment {
@@ -89,7 +91,7 @@ export interface UserProfile {
   name: string;
   photoURL: string;
   role: UserRole;
-  clubRole?: 'entrenador' | 'jugador' | 'director' | 'otro';
+  clubRole?: 'entrenador' | 'jugador' | 'director' | 'otro' | 'administrador';
   
   // Control de Acceso por Tiempo Limitado (1, 3, 12 meses)
   membershipStatus?: 'active' | 'expired' | 'none';
