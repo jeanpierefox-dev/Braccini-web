@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { collection, query, onSnapshot, doc, updateDoc, deleteDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { UserProfile } from '../types';
-import { Trash2, Edit2, Plus, X, Loader2, Save, User as UserIcon } from 'lucide-react';
+import { Trash2, Edit2, Plus, X, Loader2, Save, User as UserIcon, FileDown } from 'lucide-react';
+import { generatePlayerRegistrationPDF } from '../utils/pdfGenerators';
 import { useSettings } from '../hooks/useSettings';
 
 export function AdminUsersTab() {

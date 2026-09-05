@@ -4,6 +4,7 @@ import { db } from '../lib/firebase';
 import { UniformOrder } from '../types';
 import { Trash2, Edit2, Plus, X, Loader2, Save, Shirt, Download, CheckCircle2 } from 'lucide-react';
 import { useSettings } from '../hooks/useSettings';
+import { generateUniformBatchPDF } from '../utils/pdfGenerators';
 
 export function AdminUniformsTab() {
   const [uniformOrders, setUniformOrders] = useState<UniformOrder[]>([]);
@@ -145,10 +146,19 @@ export function AdminUniformsTab() {
         </h2>
         <div className="flex items-center gap-3">
           <button
+            onClick={() => {
+              const toExport = selectedBatch === 'Todos' ? uniformOrders : uniformOrders.filter(o => o.batchName === selectedBatch);
+              generateUniformBatchPDF(toExport, selectedBatch, settings);
+            }}
+            className="bg-blue-600 text-white border border-blue-500 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-blue-500 transition-colors"
+          >
+            <FileDown className="w-4 h-4" /> PDF
+          </button>
+          <button
             onClick={exportCSV}
             className="bg-zinc-800 text-white border border-zinc-700 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-zinc-700 transition-colors"
           >
-            <Download className="w-4 h-4" /> Exportar CSV
+            <Download className="w-4 h-4" /> CSV
           </button>
           <button
             onClick={handleAddNew}
