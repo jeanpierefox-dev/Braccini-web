@@ -6,6 +6,7 @@ import { UserProfile, MediaItem, MediaCategory, UserRole, Payment, ClubSettings,
 import { AdminSettingsTab } from '../components/AdminSettingsTab';
 import { AdminUsersTab } from '../components/AdminUsersTab';
 import { AdminMediaTab } from '../components/AdminMediaTab';
+import { AdminUniformsTab } from '../components/AdminUniformsTab';
 import { Upload, Trash2, Shield, User as UserIcon, LayoutTemplate, Activity, Settings, Wallet, Printer, Plus, Palette, Eye, Smartphone, CheckCircle, Megaphone, Trophy, Sparkles, RefreshCw, Phone, Mail, MapPin, Instagram, Facebook, FileText, MessageSquare, Star, CornerDownRight, ShieldCheck, Filter, Check, Send, Building2, AlertCircle, Shirt, FileDown, FileSpreadsheet, Layers, X, Edit2, Edit3, DollarSign, CheckSquare } from "lucide-react";
 
 export function AdminPanel() {
@@ -116,45 +117,7 @@ export function AdminPanel() {
           </div>
         )}
 
-        {activeTab === 'uniforms' && (
-          <div className="space-y-4 bg-zinc-900 p-4 rounded-xl border border-zinc-800">
-            <h2 className="text-xl font-bold">Control de Uniformes</h2>
-            <div className="flex items-center gap-4">
-              <select 
-                value={selectedUniformBatch}
-                onChange={(e) => setSelectedUniformBatch(e.target.value)}
-                className="bg-black border border-zinc-800 rounded-lg px-4 py-2 text-white"
-              >
-                {batches.map(b => (
-                  <option key={b} value={b}>{b}</option>
-                ))}
-              </select>
-              {selectedUniformBatch !== 'Todos los Lotes' && (
-                <button
-                  type="button"
-                  onClick={() => handleDeleteUniformBatch(selectedUniformBatch)}
-                  className="text-xs bg-red-500/20 text-red-400 hover:bg-red-500 hover:text-white px-3 py-1.5 rounded-lg border border-red-500/30 transition-colors"
-                >
-                  Eliminar Lote
-                </button>
-              )}
-            </div>
-            
-            {/* List Uniforms */}
-            <div className="space-y-2 mt-4">
-              {uniformOrders.filter(o => selectedUniformBatch === 'Todos los Lotes' || o.batchName === selectedUniformBatch).map(order => (
-                <div key={order.id} className="bg-black p-3 rounded-lg border border-zinc-800 flex justify-between items-center">
-                  <div>
-                    <p className="font-bold">{order.userName} - {order.itemType || order.type}</p>
-                    <p className="text-xs text-zinc-400">Talla: {order.size} | Número: {order.number || order.jerseyNumber}</p>
-                  </div>
-                  <div className="text-xs text-zinc-500">{order.batchName}</div>
-                </div>
-              ))}
-              {uniformOrders.length === 0 && <p className="text-zinc-500">No hay pedidos de uniformes.</p>}
-            </div>
-          </div>
-        )}
+        {activeTab === 'uniforms' && <AdminUniformsTab />}
 
         {activeTab === 'media' && <AdminMediaTab />}
         {activeTab === 'users' && <AdminUsersTab />}

@@ -1,5 +1,5 @@
 import { useState, useEffect, type FormEvent, type ChangeEvent } from 'react';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
 import { updateProfile } from 'firebase/auth';
 import { db, auth } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
@@ -201,7 +201,7 @@ export function Profile() {
         };
       }
 
-      await updateDoc(docRef, updateData);
+      await setDoc(docRef, updateData, { merge: true });
       
       if (auth.currentUser && profile.photoURL) {
         try {

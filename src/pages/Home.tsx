@@ -118,7 +118,7 @@ const DEFAULT_ACTION_PHOTOS = [
 
 import { Eye, Building2, User as UserIcon } from "lucide-react";
 
-const isVideo = (url?: string) => url && (url.includes('youtube.com') || url.includes('youtu.be') || url.includes('vimeo.com') || url.match(/\.(mp4|webm|ogg)$/i));
+const isVideo = (url?: string): boolean => !!(url && (url.includes('youtube.com') || url.includes('youtu.be') || url.includes('vimeo.com') || url.match(/\.(mp4|webm|ogg)$/i)));
 export function Home() {
   useEffect(() => {
     // Increment page views
@@ -153,6 +153,7 @@ export function Home() {
 
   // Publications Filter (all, entrenos, partidos, paseos, institucional)
   const [publicationCategoryFilter, setPublicationCategoryFilter] = useState<string>('all');
+  const [mediaFormatFilter, setMediaFormatFilter] = useState<string>('all');
 
   // Publication Comments Modal state
   const [activeCommentsModal, setActiveCommentsModal] = useState<{
@@ -297,12 +298,25 @@ export function Home() {
 
   // Filtered publications based on selected category tab
   const filteredRotatingPhotos = useMemo(() => {
-    if (publicationCategoryFilter === 'all') return rotatingPhotos;
     return rotatingPhotos.filter(item => {
-      const cat = item.category?.toLowerCase() || '';
-      return cat === publicationCategoryFilter.toLowerCase();
+      // Filter by category
+      let categoryMatch = true;
+      if (publicationCategoryFilter !== 'all') {
+        const cat = item.category?.toLowerCase() || '';
+        categoryMatch = cat === publicationCategoryFilter.toLowerCase();
+      }
+      
+      // Filter by format (photo vs video)
+      let formatMatch = true;
+      if (mediaFormatFilter === 'photos') {
+        formatMatch = !isVideo(item.url);
+      } else if (mediaFormatFilter === 'videos') {
+        formatMatch = isVideo(item.url);
+      }
+      
+      return categoryMatch && formatMatch;
     });
-  }, [rotatingPhotos, publicationCategoryFilter]);
+  }, [rotatingPhotos, publicationCategoryFilter, mediaFormatFilter]);
 
   // Auto-rotate the active slide photo every 5.5 seconds
   useEffect(() => {
@@ -954,8 +968,31 @@ export function Home() {
                 </p>
               </div>
 
-              {/* Filtros de Categoría */}
-              <div className="flex flex-wrap gap-1 bg-zinc-900/90 p-1 rounded-xl border border-zinc-800 self-start md:self-auto">
+              {/* Filtros de Categoría y Formato */}
+              <div className="flex flex-col md:flex-row gap-3 self-start md:self-auto">
+                <div className="flex flex-wrap gap-1 bg-zinc-900/90 p-1 rounded-xl border border-zinc-800">
+                  {[
+                    { id: 'all', label: 'Todo Formato' },
+                    { id: 'photos', label: '📷 Fotos' },
+                    { id: 'videos', label: '🎥 Videos' },
+                  ].map(cat => {
+                    const isActive = mediaFormatFilter === cat.id;
+                    return (
+                      <button
+                        key={cat.id}
+                        onClick={() => setMediaFormatFilter(cat.id)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          isActive 
+                            ? 'bg-zinc-700 text-white shadow-md' 
+                            : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
+                        }`}
+                      >
+                        {cat.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="flex flex-wrap gap-1 bg-zinc-900/90 p-1 rounded-xl border border-zinc-800">
                 {[
                   { id: 'all', label: 'Todos' },
                   { id: 'entrenos', label: '🏐 Entrenos' },
@@ -982,6 +1019,7 @@ export function Home() {
                     </button>
                   );
                 })}
+              </div>
               </div>
             </div>
 
