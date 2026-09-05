@@ -9,6 +9,8 @@ export interface ClubSettings {
   slogan?: string;
   description?: string;
   logoUrl: string;
+  clubStampUrl?: string; // Sello del club para documentos formales
+  directorSignatureUrl?: string; // Firma digital del director para documentos
   primaryColor?: string;
   primaryRgb?: string;
   accentColor?: string;
@@ -113,6 +115,7 @@ export interface UserProfile {
   // Ficha Deportiva y Corporativa (Solo Jugadores y Entrenadores)
   dni?: string;
   category?: string;
+  playerSignatureUrl?: string; // Firma digital del atleta
   height?: string;
   weight?: string;
   dominantHand?: string;

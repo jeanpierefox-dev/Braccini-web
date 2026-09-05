@@ -228,16 +228,7 @@ export function AdminMediaTab() {
 
               <div className="text-center text-xs text-zinc-500 font-bold uppercase tracking-wider">O</div>
 
-              <div>
-                <label className="block text-xs font-semibold text-zinc-400 mb-1">URL de Video (Youtube, Vimeo, etc)</label>
-                <input 
-                  type="url" 
-                  value={currentMedia.url || ''} 
-                  onChange={(e) => setCurrentMedia({...currentMedia, url: e.target.value})}
-                  placeholder="https://www.youtube.com/watch?v=..."
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
-                />
-              </div>
+
             </div>
           </div>
           

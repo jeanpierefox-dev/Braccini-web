@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, query, onSnapshot, doc, updateDoc, deleteDoc, addDoc, serverTimestamp, orderBy } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { UniformOrder } from '../types';
-import { Trash2, Edit2, Plus, X, Loader2, Save, Shirt, Download, CheckCircle2 } from 'lucide-react';
+import { Trash2, Edit2, Plus, X, Loader2, Save, Shirt, Download, CheckCircle2 , FileDown} from 'lucide-react';
 import { useSettings } from '../hooks/useSettings';
 import { generateUniformBatchPDF } from '../utils/pdfGenerators';
 

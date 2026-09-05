@@ -67,6 +67,29 @@ export function generatePlayerRegistrationPDF(player: UserProfile, settings: Clu
   doc.setTextColor(100, 100, 100);
   doc.text(`"${slogan}" - Expediente Deportivo Confidencial`, 105, currentY, { align: 'center' });
 
+  // Background Watermark Logo
+  if (settings.logoUrl) {
+    try {
+      doc.setGState(new (doc as any).GState({ opacity: 0.1 }));
+      // Center a large watermark
+      doc.addImage(settings.logoUrl, 'PNG', 45, 100, 120, 120);
+      doc.setGState(new (doc as any).GState({ opacity: 1.0 }));
+    } catch (e) {
+      console.warn("Could not draw watermark", e);
+    }
+  }
+
+  // Header Logo (Top Right or Left)
+  if (settings.logoUrl) {
+    try {
+      // Small logo in the header
+      doc.addImage(settings.logoUrl, 'PNG', 15, 23, 20, 20);
+    } catch (e) {
+      console.warn("Could not draw header logo", e);
+    }
+  }
+
+
   // Document metadata box
   currentY += 6;
   doc.setDrawColor(220, 220, 220);
@@ -705,6 +728,35 @@ export function generatePlayerFeeStatementPDF(
   doc.setTextColor(255, 255, 255);
   doc.text(`${clubName} • Estado de Cuenta Individual • Generado el ${format(new Date(), "dd/MM/yyyy HH:mm")}`, 105, 294.5, { align: 'center' });
 
+  
+  currentY += 20;
+  if (currentY > doc.internal.pageSize.getHeight() - 40) {
+    doc.addPage();
+    currentY = 30;
+  }
+  
+  // Director Signature
+  if (settings.directorSignatureUrl) {
+    try {
+      doc.addImage(settings.directorSignatureUrl, 'PNG', 135, currentY - 15, 45, 15);
+    } catch (e) {}
+  }
+  doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2]);
+  doc.line(130, currentY, 190, currentY);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(50, 50, 50);
+  doc.text('FIRMA ALTA DIRECCIÓN', 160, currentY + 5, { align: 'center' });
+  
+  // Club Stamp
+  if (settings.clubStampUrl) {
+    try {
+      doc.setGState(new (doc as any).GState({ opacity: 0.7 }));
+      doc.addImage(settings.clubStampUrl, 'PNG', 85, currentY - 15, 40, 40);
+      doc.setGState(new (doc as any).GState({ opacity: 1.0 }));
+    } catch (e) {}
+  }
+
   doc.save(`Estado_Cuenta_${(player.name || 'Atleta').replace(/\s+/g, '_')}_${year}.pdf`);
 }
 
@@ -741,7 +793,31 @@ export function generateGeneralTreasuryReportPDF(
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
-  doc.text(`INFORME GENERAL DE TESORERÍA Y RECAUDACIÓN • TEMPORADA ${year}`, 282, 12, { align: 'right' });
+  /doc\.text\(`INFORME GENERAL DE TESORERÍA Y RECAUDACIÓN • TEMPORADA \$\{year\}(.+)\}\);/
+
+  // Background Watermark Logo
+  if (settings.logoUrl) {
+    try {
+      doc.setGState(new (doc as any).GState({ opacity: 0.1 }));
+      // Center a large watermark
+      const w = doc.internal.pageSize.getWidth();
+      const h = doc.internal.pageSize.getHeight();
+      doc.addImage(settings.logoUrl, 'PNG', w/2 - 60, h/2 - 60, 120, 120);
+      doc.setGState(new (doc as any).GState({ opacity: 1.0 }));
+    } catch (e) {
+      console.warn("Could not draw watermark", e);
+    }
+  }
+
+  // Header Logo (Top Right or Left)
+  if (settings.logoUrl) {
+    try {
+      doc.addImage(settings.logoUrl, 'PNG', 15, 20, 15, 15);
+    } catch (e) {
+      console.warn("Could not draw header logo", e);
+    }
+  }
+
 
   let currentY = 28;
 
@@ -843,6 +919,35 @@ export function generateGeneralTreasuryReportPDF(
   doc.setFontSize(7);
   doc.setTextColor(255, 255, 255);
   doc.text(`${clubName} • Reporte General de Recaudación Consolidada • Generado el ${format(new Date(), "dd/MM/yyyy HH:mm")}`, 148, 207.5, { align: 'center' });
+
+  
+  currentY += 20;
+  if (currentY > doc.internal.pageSize.getHeight() - 40) {
+    doc.addPage();
+    currentY = 30;
+  }
+  
+  // Director Signature
+  if (settings.directorSignatureUrl) {
+    try {
+      doc.addImage(settings.directorSignatureUrl, 'PNG', 135, currentY - 15, 45, 15);
+    } catch (e) {}
+  }
+  doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2]);
+  doc.line(130, currentY, 190, currentY);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(50, 50, 50);
+  doc.text('FIRMA ALTA DIRECCIÓN', 160, currentY + 5, { align: 'center' });
+  
+  // Club Stamp
+  if (settings.clubStampUrl) {
+    try {
+      doc.setGState(new (doc as any).GState({ opacity: 0.7 }));
+      doc.addImage(settings.clubStampUrl, 'PNG', 85, currentY - 15, 40, 40);
+      doc.setGState(new (doc as any).GState({ opacity: 1.0 }));
+    } catch (e) {}
+  }
 
   doc.save(`Resumen_General_Mensualidades_${year}.pdf`);
 }

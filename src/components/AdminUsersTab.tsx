@@ -4,6 +4,7 @@ import { db } from '../lib/firebase';
 import { UserProfile } from '../types';
 import { Trash2, Edit2, Plus, X, Loader2, Save, User as UserIcon, FileDown } from 'lucide-react';
 import { generatePlayerRegistrationPDF } from '../utils/pdfGenerators';
+import { compressImageFile } from '../utils/imageCompressor';
 import { useSettings } from '../hooks/useSettings';
 
 export function AdminUsersTab() {
@@ -148,9 +149,102 @@ export function AdminUsersTab() {
                 <option value="">Ninguno</option>
               </select>
             </div>
+            <div>
+              <label className="block text-xs font-semibold text-zinc-400 mb-1">DNI / Documento</label>
+              <input 
+                type="text" 
+                value={currentUser.dni || ''} 
+                onChange={(e) => setCurrentUser({...currentUser, dni: e.target.value})}
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-zinc-400 mb-1">Teléfono</label>
+              <input 
+                type="text" 
+                value={currentUser.phone || ''} 
+                onChange={(e) => setCurrentUser({...currentUser, phone: e.target.value})}
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-zinc-400 mb-1">Categoría</label>
+              <input 
+                type="text" 
+                value={currentUser.category || ''} 
+                onChange={(e) => setCurrentUser({...currentUser, category: e.target.value})}
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-zinc-400 mb-1">Altura (m)</label>
+              <input 
+                type="text" 
+                value={currentUser.height || ''} 
+                onChange={(e) => setCurrentUser({...currentUser, height: e.target.value})}
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-zinc-400 mb-1">Peso (kg)</label>
+              <input 
+                type="text" 
+                value={currentUser.weight || ''} 
+                onChange={(e) => setCurrentUser({...currentUser, weight: e.target.value})}
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-zinc-400 mb-1">Foto del Perfil</label>
+              <div className="flex items-center gap-3">
+                {currentUser.photoURL && (
+                  <img src={currentUser.photoURL} alt="Preview" className="w-10 h-10 rounded-full object-cover border border-zinc-700" />
+                )}
+                <input 
+                  type="file" 
+                  accept="image/*"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      try {
+                        const dataUrl = await compressImageFile(file, 400, 400, 0.8);
+                        setCurrentUser({...currentUser, photoURL: dataUrl});
+                      } catch(err) {
+                        console.error(err);
+                      }
+                    }
+                  }}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-zinc-400 mb-1">Firma Digital del Atleta (PDF)</label>
+              <div className="flex items-center gap-3">
+                {currentUser.playerSignatureUrl && (
+                  <img src={currentUser.playerSignatureUrl} alt="Firma Preview" className="h-10 object-contain bg-zinc-800 rounded px-2" />
+                )}
+                <input 
+                  type="file" 
+                  accept="image/*"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      try {
+                        const dataUrl = await compressImageFile(file, 400, 200, 0.85);
+                        setCurrentUser({...currentUser, playerSignatureUrl: dataUrl});
+                      } catch(err) {
+                        console.error(err);
+                      }
+                    }
+                  }}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+            </div>
           </div>
           
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex justify-end gap-3 pt-4 border-t border-zinc-800">
             <button type="button" onClick={() => setIsEditing(false)} className="px-4 py-2 text-sm font-bold text-zinc-400 hover:text-white">Cancelar</button>
             <button type="submit" disabled={saving} className="bg-emerald-500 text-black px-6 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-emerald-600 transition-colors">
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
@@ -183,6 +277,9 @@ export function AdminUsersTab() {
                 </div>
                 
                 <div className="flex items-center gap-2">
+                  <button onClick={() => generatePlayerRegistrationPDF(u, settings)} title="Descargar Ficha PDF" className="p-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 rounded-lg transition-colors border border-blue-500/20">
+                    <FileDown className="w-4 h-4" />
+                  </button>
                   <button onClick={() => handleEdit(u)} className="p-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white rounded-lg transition-colors border border-zinc-800 hover:border-zinc-700">
                     <Edit2 className="w-4 h-4" />
                   </button>

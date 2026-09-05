@@ -156,6 +156,72 @@ export function AdminSettingsTab() {
             </button>
           </div>
         </div>
+        <div className="pt-4 border-t border-zinc-800/50">
+          <label className="block text-xs font-semibold text-zinc-400 mb-2">Sello del Club (Marca de Agua / PDF)</label>
+          <div className="flex flex-col gap-2">
+            <label className="flex items-center gap-3 w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-400">
+              <span className="flex-1 truncate">{settings.clubStampUrl ? 'Imagen cargada' : 'Sin imagen, haz clic abajo'}</span>
+              {settings.clubStampUrl && <img src={settings.clubStampUrl} alt="Stamp preview" className="w-6 h-6 object-contain" />}
+            </label>
+            <input 
+              type="file" 
+              accept="image/*"
+              className="hidden"
+              id="upload-stamp"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  try {
+                    setSaving(true);
+                    const dataUrl = await compressImageFile(file, 600, 600, 0.85);
+                    setSettings(prev => ({ ...prev, clubStampUrl: dataUrl }));
+                  } catch(err) { console.error(err); } finally { setSaving(false); }
+                }
+              }}
+            />
+            <button 
+              type="button"
+              onClick={() => document.getElementById('upload-stamp')?.click()}
+              className="w-full bg-black hover:bg-zinc-800 border border-zinc-800 rounded-lg px-3 py-2 text-sm flex justify-center items-center gap-2 transition-colors text-zinc-300"
+            >
+              <Upload className="w-4 h-4" /> Seleccionar Sello
+            </button>
+          </div>
+        </div>
+
+        <div className="pt-4 border-t border-zinc-800/50">
+          <label className="block text-xs font-semibold text-zinc-400 mb-2">Firma Digital del Director (PDF)</label>
+          <div className="flex flex-col gap-2">
+            <label className="flex items-center gap-3 w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-400">
+              <span className="flex-1 truncate">{settings.directorSignatureUrl ? 'Imagen cargada' : 'Sin imagen, haz clic abajo'}</span>
+              {settings.directorSignatureUrl && <img src={settings.directorSignatureUrl} alt="Signature preview" className="w-8 h-4 object-contain" />}
+            </label>
+            <input 
+              type="file" 
+              accept="image/*"
+              className="hidden"
+              id="upload-signature"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  try {
+                    setSaving(true);
+                    const dataUrl = await compressImageFile(file, 600, 200, 0.85);
+                    setSettings(prev => ({ ...prev, directorSignatureUrl: dataUrl }));
+                  } catch(err) { console.error(err); } finally { setSaving(false); }
+                }
+              }}
+            />
+            <button 
+              type="button"
+              onClick={() => document.getElementById('upload-signature')?.click()}
+              className="w-full bg-black hover:bg-zinc-800 border border-zinc-800 rounded-lg px-3 py-2 text-sm flex justify-center items-center gap-2 transition-colors text-zinc-300"
+            >
+              <Upload className="w-4 h-4" /> Seleccionar Firma
+            </button>
+          </div>
+        </div>
+
 
         {/* Diseño y Apariencia */}
         <div className="space-y-4">
